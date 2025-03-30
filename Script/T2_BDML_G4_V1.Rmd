@@ -336,6 +336,19 @@ mod_1_F <- train(Pobre~.,
 ```{r}
 mod_1_F
 ```
+##2.5 Modelo Logit
+```{r}
+#Calculo de los estimadores Logit
+mod_1_logit<- glm(Pobre~., 
+                 data = train_factors, 
+                 family = "binomial")
+
+```
+
+##2.6 Resultados Logit 
+```{r}
+summary(mod_1_logit,type="text")
+```
 
 #3 Predicciones
 
@@ -356,6 +369,7 @@ predictSample_EN<- predictSample_EN %>%
                   select(id,pobre)
 head(predictSample_EN) 
 ```
+
 ```{r}
 nrow(predictSample_EN)
 
@@ -363,10 +377,35 @@ str(predictSample_EN)
 head(predictSample_EN)
 ```
 
+##3.3 Prediccion_Logit
+```{r}
+#Predecir los resultados a partir de los estimadores Logit
+predictSample_logit<- test_factors %>% 
+  mutate(prob_hat=predict(est_logit,
+                          newdata = test_factors, 
+                          type = "response"), #type = "response" gives the predicted probabilities.
+         prob_logodds = predict(est_logit,
+                          newdata = test_factors, 
+                          type = "link"), #type = "link" gives the predicted log-odds.
+         prob2 = predict(est_logit,
+                          newdata = test_factors) 
+         ) 
+```
+
+#Aqui quede....
+```{r}
+head(predictSample_logit %>% 
+       select(id,pobre,prob_hat,prob_logodds,prob2))
+```
+```{r}
+predictSample_logit<- predictSample_logit %>% 
+                  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
+                  select(id,pobre)
+head(predictSample_logit) 
+```
 ##3.2 Template_EN
 ```{r}
 write.csv(predictSample_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_EN.csv", row.names = FALSE)
-
 
 ```
 
