@@ -1,0 +1,378 @@
+---
+title: "Taller_2"
+author: GARCIA BERNAL, ZAIRA ALEJANDRA RIVERA SANABRIA, LAURA SARIF JACOME VELASCO,
+  NICOLAS VIAFARA MORALES, JORGE ELIECER
+date: "2025-03-22"
+output: html_document
+---
+
+```{r}
+#Cargar los paquetes de trabajo
+require("pacman")
+p_load(tidyverse, # tidy-data
+       glmnet, # To implement regularization algorithms. 
+       caret, # creating predictive models
+       BiocManager,
+       Metrics
+)
+
+install.packages("MLmetrics") # To calculate metrics
+require(MLmetrics)
+```
+#A Train 
+```{r}
+#Asignar y cargar las bases de datos Entrenamiento
+
+train_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_hogares.csv")
+train_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_personas.csv")
+
+```
+
+##A.1 Base Train Hogares
+```{r}
+#Nombre de las columnas de la base train_hogares
+
+colnames(train_hogares)
+```
+
+```{r}
+#Seleccion de la columnas id de hogares
+train_hogares %>%
+  select(id) %>%
+  head()
+```
+
+```{r}
+#Cantidad de hogares probres de la base train_hogares
+table(train_hogares$Pobre)
+```
+
+```{r}
+#Incluir una columna con la asignacion de 1 si el ingreso per capita hogar es menor a la linea de probreza y 0 en caso contrario
+train_hogares <- train_hogares %>% 
+  mutate(pobre_hand=ifelse(Ingpcug<Lp,1,0))
+```
+
+```{r}
+#Representación en tabla de los resultado
+table(train_hogares$Pobre,train_hogares$pobre_hand)
+```
+
+##A.2 Base Train Personas
+```{r}
+#Nombre de las columnas de la base train_personas
+
+colnames(train_personas)
+```
+
+```{r}
+#Selección de la columnas id y orden de los mienbros de la base personas
+train_personas %>%
+  select(id, Orden) %>%
+  head()
+```
+
+```{r}
+#Agrupa las personas por hogar y calculo del indicie de personas inactivas
+train_personas_1<- train_personas %>%
+  group_by(id)%>%
+  summarize(h_inactivos=sum(Ina, na.rm = TRUE),
+            h_pet=sum(Pet, na.rm = TRUE))%>%
+  mutate(h_inactivosp=h_inactivos/h_pet) %>%
+  ungroup()
+```
+
+#B Test
+```{r}
+#Asignar y cargar las bases de datos prueba
+
+test_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_hogares.csv")
+test_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_personas.csv")
+
+```
+
+##B.1 Base Test Hogares
+```{r}
+#Nombre de las columnas de la base test_hogares
+
+colnames(test_hogares)
+```
+
+```{r}
+#Selección de la columnas id y número de personas por hogar
+test_hogares %>%
+  select(id, Npersug) %>%
+  head()
+```
+
+
+##B.2 Base Test Personas
+```{r}
+#Nombre de las columnas de la base test_personas
+
+colnames(test_personas)
+```
+
+#1. Pre procesamiento
+
+```{r}
+#Pre procesamiento de la base Train_Personas
+clear_train_personas <- train_personas %>% 
+  mutate(mujer = ifelse(P6020==2,1,0),
+  mayor_edad = ifelse(P6040 >= 18,1,0), #Mayores de edad
+  H_Head = ifelse(P6050== 1, 1, 0), #Household head
+  afi_salud = ifelse (P6090==1,1,0), #Afiliacion de salud
+  afi_salud = ifelse (is.na(afi_salud),0,1), #Reemplazo de los NA
+  EducLevel = ifelse(P6210==9,0,P6210), #Replace 9 with 0
+  EducLevel = ifelse(is.na(EducLevel),0,EducLevel),#Reemplazo de los NA
+  act_semana_pasada = ifelse(P6240 == 6,0,P6240),
+  act_semana_pasada = ifelse(is.na(act_semana_pasada),0,act_semana_pasada), #Reemplazo de los NA
+  t_trab_semanal = ifelse(is.na(P6426),0,1),
+  cotizando = ifelse(P6920 == 3, 1, P6920), #Incluir los pensionados
+  cotizando = ifelse(is.na(cotizando),0,cotizando),#Reemplazo de los NA
+  ocupado = ifelse(is.na(Oc),0,1)) %>%
+  select(id, Orden,mujer,mayor_edad,H_Head,afi_salud,EducLevel,act_semana_pasada,t_trab_semanal,cotizando,ocupado)
+
+#Pre procesamiento de la base Test_Personas
+clear_test_personas <- test_personas %>% 
+  mutate(mujer = ifelse(P6020==2,1,0),
+  mayor_edad = ifelse(P6040 >= 18,1,0), #Mayores de edad
+  H_Head = ifelse(P6050== 1, 1, 0), #Household head
+  afi_salud = ifelse (P6090==1,1,0), #Afiliacion de salud
+  afi_salud = ifelse (is.na(afi_salud),0,1), #Reemplazo de los NA
+  EducLevel = ifelse(P6210==9,0,P6210), #Replace 9 with 0
+  EducLevel = ifelse(is.na(EducLevel),0,EducLevel),#Reemplazo de los NA
+  act_semana_pasada = ifelse(P6240 == 6,0,P6240),
+  act_semana_pasada = ifelse(is.na(act_semana_pasada),0,act_semana_pasada), #Reemplazo de los NA
+  t_trab_semanal = ifelse(is.na(P6426),0,1),
+  cotizando = ifelse(P6920 == 3, 1, P6920), #Incluir los pensionados
+  cotizando = ifelse(is.na(cotizando),0,cotizando),#Reemplazo de los NA
+  ocupado = ifelse(is.na(Oc),0,1)) %>%
+  select(id, Orden,mujer,mayor_edad,H_Head,afi_salud,EducLevel,act_semana_pasada,t_trab_semanal,cotizando,ocupado)
+```
+
+```{r}
+colnames(clear_train_personas)
+```
+
+```{r}
+colnames(clear_test_personas)
+```
+
+##1.2 Argupar y unir Train Personas
+```{r}
+#Agrupar el entrenamiento de la base personas a nivel hogar y unir las bases de datos por medio de id.
+
+summary_train_personas_nivel_hogar <- clear_train_personas %>% 
+  group_by(id) %>% 
+  summarize(nmujeres = sum(mujer,na.rm=TRUE),
+            nmayor_edad = sum(mayor_edad,na.rm=TRUE),
+            nafi_salud = sum(afi_salud, na.rm = TRUE),
+            maxEducLevel = max(EducLevel,na.rm=TRUE),
+            nt_trab_semanal = sum(t_trab_semanal,na.rm = TRUE),
+            ncotizando = sum(cotizando,na.rm = TRUE),
+            nocupados=sum(ocupado,na.rm=TRUE))
+
+filter_train_personas_hogar<- clear_train_personas %>% 
+                  filter(H_Head==1) %>% 
+                  select(id,mujer,afi_salud,EducLevel,cotizando,ocupado) %>% 
+                  rename(H_Head_mujer=mujer,
+                         H_afi_salud = afi_salud,
+                         H_Head_Educ_level=EducLevel,
+                         H_cotizando = cotizando,
+                         H_Head_ocupado=ocupado) %>% 
+                    left_join(summary_train_personas_nivel_hogar)
+```
+```{r}
+colnames(filter_train_personas_hogar)
+```
+
+##1.3 Argupar y unir Test Personas
+```{r}
+#Agrupar la prueba de la base personas a nivel hogar y unir las bases de datos por medio de id.
+
+
+summary_test_personas_nivel_hogar <- clear_test_personas %>% 
+  group_by(id) %>% 
+  summarize(nmujeres = sum(mujer,na.rm=TRUE),
+            nmayor_edad = sum(mayor_edad,na.rm=TRUE),
+            nafi_salud = sum(afi_salud, na.rm = TRUE),
+            maxEducLevel = max(EducLevel,na.rm=TRUE),
+            nt_trab_semanal = sum(t_trab_semanal,na.rm = TRUE),
+            ncotizando = sum(cotizando,na.rm = TRUE),
+            nocupados=sum(ocupado,na.rm=TRUE))
+
+filter_test_personas_hogar<- clear_test_personas %>% 
+                  filter(H_Head==1) %>% 
+                  select(id,mujer,afi_salud,EducLevel,cotizando,ocupado) %>% 
+                  rename(H_Head_mujer=mujer,
+                         H_afi_salud = afi_salud,
+                         H_Head_Educ_level=EducLevel,
+                         H_cotizando = cotizando,
+                         H_Head_ocupado=ocupado) %>% 
+                    left_join(summary_test_personas_nivel_hogar, by = "id")
+```
+```{r}
+colnames(filter_test_personas_hogar)
+```
+##1.4 Base de trabajo Train Hogares
+```{r}
+clear_train_hogares<- train_hogares %>% 
+  mutate(pagada= ifelse(P5090==1,1,0),
+         hipoteca= ifelse(P5090==2,1,0),
+         arriendo= ifelse(P5090==3,1,0),
+         usufructo= ifelse(P5090==4,1,0),
+         sin_titulo = ifelse(P5090==5,1,0)) %>% 
+  select(id, Clase, Nper, Dominio,pagada, hipoteca, arriendo, usufructo, sin_titulo, Lp, Pobre)
+```
+
+##1.5 Base de trabajo Test Hogares
+```{r}
+clear_test_hogares<- test_hogares %>% 
+  mutate(pagada= ifelse(P5090==1,1,0),
+         hipoteca= ifelse(P5090==2,1,0),
+         arriendo= ifelse(P5090==3,1,0),
+         usufructo= ifelse(P5090==4,1,0),
+         sin_titulo = ifelse(P5090==5,1,0)) %>% 
+  select(id, Clase, Nper, Dominio, pagada, hipoteca, arriendo, usufructo, sin_titulo, Lp)
+```
+
+##1.6 Consolidar las BD Train y Test Hogares
+```{r}
+train<- clear_train_hogares %>% 
+          left_join(filter_train_personas_hogar) %>% 
+          select(-id) #no longer need id
+
+test<- clear_test_hogares %>% 
+          left_join(filter_test_personas_hogar)
+
+```
+##1.7 Conversion a factores
+```{r}
+train_factors<- train %>% 
+  mutate(Dominio=factor(Dominio),
+         pagada=factor(pagada,levels = c(0,1),labels = c("No","Yes")),
+         hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
+         arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
+         usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
+         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
+         Pobre=factor(Pobre,levels = c(0,1),labels = c("No", "Yes")),
+         H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
+
+test_factors<- test %>% 
+  mutate(Dominio=factor(Dominio),
+         pagada=factor(pagada,levels = c(0,1),labels = c("No","Yes")),
+         hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
+         arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
+         usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
+         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
+         H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
+
+```
+
+#2. Modelo de Entrenamiento
+
+##2.1 Modelo Elastic Net
+```{r}
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    savePredictions = T)
+```
+
+```{r}
+#Modelo Elastic Net
+
+set.seed(123)
+
+mod_1_EN <- train(Pobre~.,#Modelo 1 Elastic Net
+    data=train_factors,
+    metric = "Accuracy",
+    method = "glmnet",
+    trControl = ctrl,
+    tuneGrid=expand.grid(
+              alpha = seq(0,1,by=.2),
+              lambda =10^seq(10, -2, length = 10)
+    )
+               
+)
+```
+##2.2 Resultado_EN
+```{r}
+mod_1_EN
+```
+##2.2 Modelo F1
+```{r}
+p_load(Metrics)
+fiveStats <- function(...)  c(prSummary(...))  
+
+
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    summaryFunction = fiveStats,
+                    savePredictions = TRUE)
+```
+
+```{r}
+
+set.seed(123)
+mod_1_F <- train(Pobre~.,
+    data=train_factors,
+    metric = "F",
+    method = "glmnet",
+    trControl = ctrl,
+    family="binomial",
+    tuneGrid=expand.grid(
+              alpha = seq(0,1,by=.5),
+              lambda =10^seq(-1, -3, length = 10)
+    )
+
+)
+```
+##2.4 Resultado_F1
+```{r}
+mod_1_F
+```
+
+#3 Predicciones
+
+##3.1 Predicción_EN
+```{r}
+
+predictSample_EN <- test_factors   %>% 
+  mutate(pobre_lab = predict(mod_1_EN, newdata = test_factors, type = "raw"))%>% 
+  select(id,pobre_lab)
+
+head(predictSample_EN)
+
+```
+
+```{r}
+predictSample_EN<- predictSample_EN %>% 
+                  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
+                  select(id,pobre)
+head(predictSample_EN) 
+```
+```{r}
+nrow(predictSample_EN)
+
+str(predictSample_EN)
+head(predictSample_EN)
+```
+
+##3.2 Template_EN
+```{r}
+write.csv(predictSample_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_EN.csv", row.names = FALSE)
+
+
+```
+
+```{r}
+str(predictSample_EN)  # Verifica estructura
+summary(predictSample_EN)  # Estadísticas básicas
+head(predictSample_EN, 10)  # Muestra las primeras 10 filas
+```
+
