@@ -438,5 +438,42 @@ summary(predictSample_EN)  # Estadísticas básicas
 head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 ```
 
+##3.4 Predicción_Logit
+```{r}
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    savePredictions = TRUE,
+                    verbose=T
+                    )
+```
 
+```{r}
+set.seed(123)
+mod_2_logit <- train(Pobre~. ,
+                       data = train_factors, 
+                       method = "glm",
+                       family = "binomial",
+                       trControl = ctrl
+                       )
+```
+
+```{r}
+print(paste("Mean accuracy: ",mean(mod_2_logit$resample$Accuracy)))
+```
+
+```{r}
+logit_accuracy<-mod_2_logit$results$Accuracy
+logit_accuracy
+```
+###Quede aquí....
+```{r}
+predict_logit <- data.frame(
+  Pobre = mod_2_logit$Pobre,                             ## observed class labels
+  prob_hat = predict(prob_hat, newdata = credit, type = "prob"),     ## predicted class probabilities
+  pred = predict(default_logit, newdata = credit, type = "raw")    ## predicted class labels
+)
+
+head(predict_logit)
+```
 
