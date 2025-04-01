@@ -336,7 +336,9 @@ mod_1_F <- train(Pobre~.,
 ```{r}
 mod_1_F
 ```
-##2.5 Modelo Logit
+#3. Entrenamiento Modelo Logit
+
+##3.1 Estimadores logit
 ```{r}
 #Calculo de los estimadores Logit
 mod_1_logit<- glm(Pobre~., 
@@ -345,14 +347,14 @@ mod_1_logit<- glm(Pobre~.,
 
 ```
 
-##2.6 Resultados Logit 
+##3.2 Resultados Estimadores Logit 
 ```{r}
 summary(mod_1_logit,type="text")
 ```
-## 2.7 Probabilidad Logit
 
+## 3.3 Probabilidad Logit
 ```{r}
-#Predecir los resultados a partir de los estimadores Logit
+#Calculo de probabilidades
 predictSample_logit<- train_factors %>% 
   mutate(prob_hat=predict(est_logit,
                           newdata = train_factors, 
