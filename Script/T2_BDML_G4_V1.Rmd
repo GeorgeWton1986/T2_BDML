@@ -387,7 +387,6 @@ head(prob_logit %>%
 ```
 
 ##3.6 Accuracy Logit 
-
 ```{r}
 
 A <- with(prob_logit,table(Pobre,pred_pobre))
