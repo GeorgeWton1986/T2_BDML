@@ -386,7 +386,18 @@ head(prob_logit %>%
 
 ```
 
-##3.6 Entrenamiento Fuera de muestra Modelo_Logit
+##3.6 Accuracy Logit 
+
+```{r}
+
+A <- with(prob_logit,table(Pobre,pred_pobre))
+
+Accuracy <- (A[1]+ A[4])/(A[1]+ A[2] + A[3]+  A[4])
+Accuracy
+
+```
+
+##3.7 Entrenamiento Fuera de muestra Modelo_Logit
 ```{r}
 ctrl<- trainControl(method = "cv",
                     number = 5,
@@ -396,7 +407,7 @@ ctrl<- trainControl(method = "cv",
                     )
 ```
 
-##3.7 Entrenamiento modelo 2
+##3.8 Entrenamiento modelo 2
 ```{r}
 set.seed(123)
 mod_2_logit <- train(Pobre~. ,
@@ -407,75 +418,51 @@ mod_2_logit <- train(Pobre~. ,
                        )
 
 mod_2_logit
-
-# print(paste("Mean accuracy: ",mean(mod_2_logit$resample$Accuracy)))
-# logit_accuracy<-mod_2_logit$results$Accuracy
-# logit_accuracy
 ```
-##3.8 Predición/Clasificacion 
+
+##3.9 Rendimiento del test
 ```{r}
-#Crear un Data Frame con las observaciones iniciales y luego predecir con la muestra test
-predictTest_logit <- data.frame(
-  pred_test_prob = predict(mod_2_logit,
+print(paste("Mean accuracy: ",mean(mod_2_logit$resample$Accuracy)))
+logit_accuracy<-mod_2_logit$results$Accuracy
+logit_accuracy
+```
+
+##3.10 Predición/Clasificacion 
+```{r}
+#Evaluacion en el Test Set
+predictTest_logit <- test_factors   %>% 
+  mutate(pred_test_prob = predict(mod_2_logit,
           newdata = test_factors,
           type = "prob"), #Prediccion con probabilidades
   pred_test_raw = predict(mod_2_logit,
                  newdata = test_factors,
-                 type = "raw")
-)
+                 type = "raw"))%>% 
+  select(id,pred_test_raw)
 
+head(predict_logit)
+
+```
+```{r}
+predictTest_logit<- predictTest_logit %>% 
+                  mutate(Pobre_test=ifelse(pred_test_raw=="Yes",1,0)) %>% 
+                  select(id,Pobre_test)
+
+head(predictTest_logit) 
+```
+```{r}
+nrow(predictTest_logit)
+str(predictTest_logit)
 head(predictTest_logit)
 ```
 
 
 
-```{r}
-
-predict_logit <- test_factors   %>% 
-  mutate(pobre = predict(mod_2_logit, 
-                        newdata = test_factors, 
-                        type = "raw"))%>% 
-  select(id,pobre)
-
-head(predict_logit)
-
-```
-```{r}
-predict_logit<- predict_logit %>% 
-                  mutate(pobre=ifelse(pobre=="Yes",1,0)) %>% 
-                  select(id,pobre)
-head(predict_logit) 
-```
-```{r}
-nrow(predict_logit)
-str(predict_logit)
-head(predict_logit)
-```
-
-
-
-
-
-
-
-
-
-
-## 2.10 Accuracy Logit 
+##3.11 Template_Logit
 
 ```{r}
-A <- with(prob_logit,table(Pobre,pred_pobre))
-
-Accuracy <- (A[1]+ A[4])/(A[1]+ A[2] + A[3]+  A[4])
-Accuracy
+write.csv(predictTest_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_Logit.csv", row.names = FALSE)
 ```
 
-## 2.11 Grafico de Resultados 
-
-```{r}
-## Mosaico por regiones
-plot(Pobre ~ Dominio, data=predictSample_logit, col=c(8,2), ylab="Pobre") ## surprise!
-```
 
 #3 Predicciones
 
@@ -520,11 +507,6 @@ head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 
 
 
-##3.4 Template_Logit
-
-```{r}
-write.csv(predictSample_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_Logit.csv", row.names = FALSE)
-```
 
 
 
