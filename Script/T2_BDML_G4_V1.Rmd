@@ -352,43 +352,119 @@ mod_1_logit<- glm(Pobre~.,
 summary(mod_1_logit,type="text")
 ```
 
-## 3.3 Probabilidad Logit
+##3.3 Probabilidad Logit
 ```{r}
 #Calculo de probabilidades
-predictSample_logit<- train_factors %>% 
-  mutate(prob_hat=predict(est_logit,
+prob_logit<- train_factors %>% 
+  mutate(prob_hat=predict(mod_1_logit,
                           newdata = train_factors, 
                           type = "response"), #type = "response" gives the predicted probabilities.
-         prob_logodds = predict(est_logit,
+         prob_logodds = predict(mod_1_logit,
                           newdata = train_factors, 
                           type = "link"), #type = "link" gives the predicted log-odds.
-         prob2 = predict(est_logit,
+         prob2 = predict(mod_1_logit,
                           newdata = train_factors))
 
 
 ```
 
-## 2.8 Resultado Probabilidad Logit
+## 3.4 Resultado Probabilidad Logit
 ```{r}
-head(predictSample_logit %>% 
-       select(Pobre,prob_hat,prob_logodds,prob2))
+head(prob_logit %>% 
+       select(Pobre,prob_hat, ))
 ```
-## 2.9 Clasificador Logit
+## 3.5 Clasificador Logit
 ```{r}
 
 rule <- 1/2 # Bayes Rule
 
-predictSample_logit<- predictSample_logit %>% 
-  mutate(prob_pobre=ifelse(prob_hat>rule,1,0))    ## predicted class labels
+pred_pobre<- prob_logit %>% 
+  mutate(pred_pobre=ifelse(prob_hat>rule,1,0))    ## prediccion de pobre
 
-head(predictSample_logit %>%
-       select(Pobre,prob_hat,prob_pobre))
+head(prob_logit %>%
+       select(Pobre,prob_hat,pred_pobre))
 
 ```
+
+##3.6 Entrenamiento Fuera de muestra Modelo_Logit
+```{r}
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    savePredictions = TRUE,
+                    verbose=T
+                    )
+```
+
+##3.7 Entrenamiento modelo 2
+```{r}
+set.seed(123)
+mod_2_logit <- train(Pobre~. ,
+                       data = train_factors, 
+                       method = "glm",
+                       family = "binomial",
+                       trControl = ctrl
+                       )
+
+mod_2_logit
+
+# print(paste("Mean accuracy: ",mean(mod_2_logit$resample$Accuracy)))
+# logit_accuracy<-mod_2_logit$results$Accuracy
+# logit_accuracy
+```
+##3.8 Predición/Clasificacion 
+```{r}
+#Crear un Data Frame con las observaciones iniciales y luego predecir con la muestra test
+predictTest_logit <- data.frame(
+  pred_test_prob = predict(mod_2_logit,
+          newdata = test_factors,
+          type = "prob"), #Prediccion con probabilidades
+  pred_test_raw = predict(mod_2_logit,
+                 newdata = test_factors,
+                 type = "raw")
+)
+
+head(predictTest_logit)
+```
+
+
+
+```{r}
+
+predict_logit <- test_factors   %>% 
+  mutate(pobre = predict(mod_2_logit, 
+                        newdata = test_factors, 
+                        type = "raw"))%>% 
+  select(id,pobre)
+
+head(predict_logit)
+
+```
+```{r}
+predict_logit<- predict_logit %>% 
+                  mutate(pobre=ifelse(pobre=="Yes",1,0)) %>% 
+                  select(id,pobre)
+head(predict_logit) 
+```
+```{r}
+nrow(predict_logit)
+str(predict_logit)
+head(predict_logit)
+```
+
+
+
+
+
+
+
+
+
+
 ## 2.10 Accuracy Logit 
 
 ```{r}
-A <- with(predictSample_logit,table(Pobre,prob_pobre))
+A <- with(prob_logit,table(Pobre,pred_pobre))
 
 Accuracy <- (A[1]+ A[4])/(A[1]+ A[2] + A[3]+  A[4])
 Accuracy
@@ -442,52 +518,8 @@ summary(predictSample_EN)  # Estadísticas básicas
 head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 ```
 
-##3.3 Predicción_Logit
-```{r}
-ctrl<- trainControl(method = "cv",
-                    number = 5,
-                    classProbs = TRUE,
-                    savePredictions = TRUE,
-                    verbose=T
-                    )
-```
 
-```{r}
-set.seed(123)
-mod_2_logit <- train(Pobre~. ,
-                       data = train_factors, 
-                       method = "glm",
-                       family = "binomial",
-                       trControl = ctrl
-                       )
-print(paste("Mean accuracy: ",mean(mod_2_logit$resample$Accuracy)))
-logit_accuracy<-mod_2_logit$results$Accuracy
-logit_accuracy
 
-```
-
-```{r}
-
-predict_logit <- test_factors   %>% 
-  mutate(pobre = predict(mod_2_logit, 
-                        newdata = test_factors, 
-                        type = "raw"))%>% 
-  select(id,pobre)
-
-head(predict_logit)
-
-```
-```{r}
-predict_logit<- predict_logit %>% 
-                  mutate(pobre=ifelse(pobre=="Yes",1,0)) %>% 
-                  select(id,pobre)
-head(predict_logit) 
-```
-```{r}
-nrow(predict_logit)
-str(predict_logit)
-head(predict_logit)
-```
 ##3.4 Template_Logit
 
 ```{r}
