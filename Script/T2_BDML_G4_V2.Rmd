@@ -555,13 +555,15 @@ table(predictTest_logit$pred_pobre_cat)
 table(predictTest_logit$pred_pobre)
 
 # Guardar los resultados
-predictTest_logit <- predictTest_logit %>%
+resultados_prediccion<- predictTest_logit %>%
   select(id, pred_pobre)
 
 # Ver las primeras filas de los resultados
-head(predictTest_logit)
+head(resultados_prediccion)
 
 ```
+
+##3.12 Graficos
 ```{r}
 # Generación de predicciones
 predictTest_logit <- test_factors %>% 
@@ -609,7 +611,7 @@ head(resultados_prediccion)
 
 ##3.12 Template_Logit
 ```{r}
-write.csv(predictTest_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
+write.csv(resultados_prediccion, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
 ```
 
 #3 Predicciones
@@ -636,7 +638,6 @@ head(predictSample_EN)
 
 ```{r}
 nrow(predictSample_EN)
-
 str(predictSample_EN)
 head(predictSample_EN)
 ```
