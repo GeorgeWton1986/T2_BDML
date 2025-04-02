@@ -272,10 +272,11 @@ test_factors<- test %>%
 
 ```
 
-#2. Modelo de Entrenamiento
+#2. Entrenamiento Modelo Elastic Net
 
 ##2.1 Modelo Elastic Net
 ```{r}
+
 ctrl<- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
@@ -358,12 +359,7 @@ summary(mod_1_logit,type="text")
 prob_logit<- train_factors %>% 
   mutate(prob_hat=predict(mod_1_logit,
                           newdata = train_factors, 
-                          type = "response"), #type = "response" gives the predicted probabilities.
-         prob_logodds = predict(mod_1_logit,
-                          newdata = train_factors, 
-                          type = "link"), #type = "link" gives the predicted log-odds.
-         prob2 = predict(mod_1_logit,
-                          newdata = train_factors))
+                          type = "response"))
 
 
 ```
@@ -371,30 +367,110 @@ prob_logit<- train_factors %>%
 ## 3.4 Resultado Probabilidad Logit
 ```{r}
 head(prob_logit %>% 
-       select(Pobre,prob_hat, ))
+       select(Pobre,prob_hat))
 ```
 ## 3.5 Clasificador Logit
 ```{r}
 
 rule <- 1/2 # Bayes Rule
 
-pred_pobre<- prob_logit %>% 
-  mutate(pred_pobre=ifelse(prob_hat>rule,1,0))    ## prediccion de pobre
+prob_logit<- prob_logit %>% 
+  mutate(pred_pobre=ifelse(prob_hat>rule,1,0))    ## prediccion de pobre (0) No pobre y (1) Pobre
 
 head(prob_logit %>%
        select(Pobre,prob_hat,pred_pobre))
 
 ```
 
-##3.6 Accuracy Logit 
+##3.6.1 Matriz de confusion
 ```{r}
+# Convertir la variable Pred_pobre a factor con etiquetas descriptivas
+prob_logit$pred_pobre_factor <- factor(prob_logit$pred_pobre,
+                                      levels = c(0, 1),
+                                      labels = c("No Pobre", "Pobre"))
 
-A <- with(prob_logit,table(Pobre,pred_pobre))
+#Creacion de una matriz de confuncion
+#           Predicho
+# Real       0    1
+#       0   [TN] [FP]
+#       1   [FN] [TP]
 
-Accuracy <- (A[1]+ A[4])/(A[1]+ A[2] + A[3]+  A[4])
-Accuracy
+#Matriz de confusión
+A <- with(prob_logit,table(Pobre,pred_pobre_factor))
+
+# Mostrar matriz de confusión
+print("Matriz de confusión:")
+print(A)
+
+# Explicacion de valores matriz de confusion
+TN <- A[1]  # Verdaderos Negativos
+FP <- A[2]  # Falsos Positivos
+FN <- A[3]  # Falsos Negativos
+TP <- A[4]  # Verdaderos Positivos
+
+# Crear tabla de conteos
+counts_table <- data.frame(
+  Categoría = c("Verdaderos Negativos (TN)", "Falsos Positivos (FP)", 
+                "Falsos Negativos (FN)", "Verdaderos Positivos (TP)"),
+  Conteo = c(TN, FP, FN, TP)
+)
+
+print(counts_table)
+
 
 ```
+##3.6.2 Metricas Modelo Logit
+```{r}
+#Métricas derivadas:
+# Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
+# Proporción de predicciones correctas.
+# Precisión (Precision): TP / (TP + FP)
+# De todos los casos predichos como "Pobres", ¿cuántos realmente lo son?
+# Sensibilidad/Recall: TP / (TP + FN)
+# De todos los casos realmente "Pobres", ¿cuántos identificamos correctamente?
+# Especificidad: TN / (TN + FP)
+# De todos los casos realmente "No pobres", ¿cuántos identificamos correctamente?
+# F1-Score: 2 * (Precisión * Recall) / (Precisión + Recall)
+# Media armónica de precisión y recall.
+
+# Accuracy
+Accuracy <- (A[1]+ A[4])/(A[1]+ A[2] + A[3]+  A[4])
+
+# Precisión
+Precision <- A[4]/(A[2] + A[4])
+
+# Recall (Sensibilidad)
+Recall <- A[4]/(A[3] + A[4])
+
+# Especificidad
+Specificity <- A[1]/(A[1] + A[2])
+
+# F1 Score
+F1 <- 2 * Precision * Recall / (Precision + Recall)
+
+# Error Rate (Tasa de error)
+ErrorRate <- 1 - Accuracy
+
+# Crear tabla de métricas
+metrics_table <- data.frame(
+  metrica = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+              "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
+  Valor = c(Accuracy, Precision, Recall, Specificity, F1, ErrorRate),
+  Descripción = c(
+    "Proporción total de predicciones correctas",
+    "De los predichos como pobres, cuántos realmente lo son",
+    "De los realmente pobres, cuántos fueron identificados correctamente",
+    "De los realmente no pobres, cuántos fueron identificados correctamente",
+    "Media armónica entre precisión y recall",
+    "Proporción de predicciones incorrectas"
+  )
+)
+
+# Mostrar tabla
+print(metrics_table)
+
+```
+
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
 ```{r}
