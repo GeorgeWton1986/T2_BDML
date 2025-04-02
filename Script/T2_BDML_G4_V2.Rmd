@@ -611,7 +611,6 @@ resultados_prediccion <- predictTest_logit %>%
 head(resultados_prediccion)
 ```
 
-
 ##3.12 Template_Logit
 ```{r}
 write.csv(resultados_prediccion, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
