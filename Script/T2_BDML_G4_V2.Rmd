@@ -369,6 +369,7 @@ prob_logit<- train_factors %>%
 head(prob_logit %>% 
        select(Pobre,prob_hat))
 ```
+
 ## 3.5 Clasificador Logit
 ```{r}
 
@@ -419,6 +420,7 @@ print(counts_table)
 
 
 ```
+
 ##3.6.2 Metricas Modelo Logit
 ```{r}
 #Métricas derivadas:
@@ -442,16 +444,16 @@ recall_train <- TP_train / (TP_train + FN_train)
 # Especificidad
 specificity_train <- TN_train / (TN_train + FP_train)
 # F1 Score
-f1_score_train <- 2 * (precision * recall) / (precision + recall)
+f1_score_train <- 2 * (precision_train * recall_train) / (precision_train + recall_train)
 # Error Rate (Tasa de error)
-error_rate_train <- 1 - accuracy
+error_rate_train <- 1 - accuracy_train
 
 
 # Crear tabla de métricas
 metrics_table_mod_1_log <- data.frame(
-  metrica = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+  metrica_train = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
               "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
-  Valor = c(Accuracy, Precision, Recall, Specificity, F1, ErrorRate),
+  Valor = c(accuracy_train, precision_train, recall_train, specificity_train, f1_score_train, error_rate_train),
   Descripción = c(
     "Proporción total de predicciones correctas",
     "De los predichos como pobres, cuántos realmente lo son",
@@ -466,7 +468,6 @@ metrics_table_mod_1_log <- data.frame(
 print(metrics_table_mod_1_log)
 
 ```
-
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
 ```{r}
@@ -497,6 +498,7 @@ summary(mod_2_logit)
 head(mod_2_logit$pred)
 
 ```
+
 ##3.9 Matriz de confusion modelo 2
 ```{r}
 #Matriz de confusion del modelo de entrenamiento
@@ -515,13 +517,14 @@ accuracy_train_cv <- (TN_train_cv + TP_train_cv) / (TN_train_cv + FP_train_cv + 
 precision_train_cv <- TP_train_cv / (TP_train_cv + FP_train_cv)
 recall_train_cv <- TP_train_cv / (TP_train_cv + FN_train_cv)
 specificity_train_cv <- TN_train_cv / (TN_train_cv + FP_train_cv)
-f1_score_train_cv <- 2 * (precision * recall) / (precision + recall)
-error_rate_train_cv <- 1 - accuracy
+f1_score_train_cv <- 2 * (precision_train_cv * recall_train_cv) / (precision_train_cv + recall_train_cv)
+error_rate_train_cv <- 1 - accuracy_train_cv
 
 # Crear un data frame con los resultados
 metrics_table_mod_2_log <- data.frame(
-  Metrica = c("Accuracy", "Precision", "Recall", "Specificity", "F1 Score", "Error Rate"),
-  Valor = c(accuracy, precision, recall, specificity, f1_score, error_rate)
+  metrica_train_cv = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+              "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
+  Valor = c(accuracy_train_cv, precision_train_cv, recall_train_cv, specificity_train_cv, f1_score_train_cv, error_rate_train_cv)
 )
 
 print(metrics_table_mod_2_log)
@@ -532,10 +535,10 @@ print(metrics_table_mod_2_log)
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
 print(importancia)
-plot(importancia)
+plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
-##3.11 Predición/Clasificacion 
+##3.11 Predición con el Test Set/Clasificacion 
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
@@ -563,7 +566,7 @@ head(resultados_prediccion)
 
 ```
 
-##3.12 Graficos
+##3.12 Gráficos de la predicción
 ```{r}
 # Generación de predicciones
 predictTest_logit <- test_factors %>% 
