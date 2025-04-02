@@ -12,27 +12,26 @@ output: html_document
 
 $$
 Poor = I(Inc < Pl)
-$$
-
-*where I is an indicator function that takes one if the family income is below a certain poverty line*
+$$ donde I es una función indicadora que toma uno si los ingresos familiares están por debajo de un determinado umbral de pobreza
 
 ## 1. Introducción
 
-La pobreza es un desafío político y social crucial en muchos países vulnerables, donde suele medirse mediante el gasto de consumo (Galvis Caballero, 2021). *Los Bosques Aleatorios (Random Forest) han demostrado alta precisión al clasificar los extremos del índice de riqueza, superando técnicas de regresión clásica*. Factores como la residencia regional y el nivel educativo son esenciales al diseñar intervenciones para mejorar los medios de vida (Okiabera, J. O., 2020). 
-
-Para enfrentar la pobreza, se han implementado subsidios y transferencias monetarias. Sin embargo, los programas sociales universales también benefician a personas que no necesitan ayuda, impulsando el uso de pruebas de medios indirectas (PMT) basadas en variables socioeconómicas como el género y las condiciones de vivienda (Brown, Ravallion & van de Walle, 2018). 
+La pobreza es un desafío político y social crucial en muchos países vulnerables, donde suele medirse mediante el gasto de consumo (Galvis Caballero, 2021). *Los Bosques Aleatorios (Random Forest) han demostrado alta precisión al clasificar los extremos del índice de riqueza, superando técnicas de regresión clásica*. Factores como la residencia regional y el nivel educativo son esenciales al diseñar intervenciones para mejorar los medios de vida (Okiabera, J. O., 2020). Para enfrentar la pobreza, se han implementado subsidios y transferencias monetarias. Sin embargo, los programas sociales universales también benefician a personas que no necesitan ayuda, impulsando el uso de pruebas de medios indirectas (PMT) basadas en variables socioeconómicas como el género y las condiciones de vivienda (Brown, Ravallion & van de Walle, 2018).
 
 Este estudio implementó cinco algoritmos de clasificación —regresión lineal, logística, red elástica, Random Forest y boosting— para predecir la pobreza en Colombia, destacando el Random Forest por su robustez (Sohnesen et al., 2017). La estructura del trabajo incluye limpieza de datos, análisis de variables, predicción de ingresos y conclusiones, proporcionando una visión integral de los factores que influyen en la pobreza. 
 
 ## 2. Datos
 
-En la presente sección se realiza una descripción de los datos y el proceso de adquisición y limpieza obtenidos en la Gran Encuesta Integrada de Hogares (GEIH) para 2018, realizada por el Departamento Administrativo Nacional de Estadística del "Informe de Pobreza Monetaria y Desigualdad". Se cuenta con dos muestras de entrenamiento y dos muestras de prueba, tanto las de entrenamiento como de prueba se componen de personas y hogares.
+### 2.1 Construcción de la muestra
 
-### 2.1 Proceso de adquisición de datos
+El proceso de construcción de la muestra inicia con la carga de los paquetes necesarios en R, utilizando require("pacman") y p_load() para facilitar la instalación y gestión de herramientas esenciales para la manipulación y análisis de datos. Se emplean paquetes como tidyverse para la transformación de datos, glmnet para la implementación de algoritmos de regularización, caret para la creación de modelos predictivos, y MLmetrics para la evaluación del desempeño de los modelos.
+
+A continuación, se cargan las bases de datos de entrenamiento y prueba, que contienen información sobre hogares (train_hogares.csv, test_hogares.csv) y personas (train_personas.csv, test_personas.csv). Se inicia el análisis exploratorio con la inspección de nombres de columnas y la selección de variables clave, como el identificador del hogar (id). En la base de hogares, se crea una nueva variable pobre_hand, que clasifica a los hogares en pobres y no pobres en función del ingreso per cápita y la línea de pobreza (Lp); Para la base de personas, se procesan los datos mediante la creación de nuevas variables, como mujer (indicador de género), mayor_edad (mayores de 18 años), afi_salud (afiliación a salud), y EducLevel (nivel educativo). Se reemplazan valores ausentes con valores adecuados y se consolidan los datos a nivel de hogar agrupando variables como el número de mujeres, mayores de edad y cotizantes en el hogar. Luego, se filtran los registros del jefe de hogar para capturar características específicas de este, como su nivel educativo y estado laboral, y se unen con la base agregada por hogar.
+
+El siguiente paso consiste en la limpieza de la base de hogares, generando nuevas variables indicadoras sobre la tenencia de la vivienda (pagada, hipoteca, arriendo, usufructo, sin_titulo). Posteriormente, las bases de hogares y personas se combinan mediante el identificador id, consolidando la información en una única base de entrenamiento (train) y una de prueba (test). Para finalizar, se convierten variables clave en factores categóricos, como el dominio geográfico, el tipo de tenencia de la vivienda y los niveles educativos. Este procesamiento asegura que los datos sean adecuados para el análisis y modelado posterior, facilitando la interpretación de los resultados y la construcción de modelos predictivos eficientes.
 
 ```{r}
 #Cargar los paquetes de trabajo
-
 require("pacman")
 p_load(tidyverse,   # tidy-data
        glmnet,      # To implement regularization algorithms. 
@@ -44,36 +43,74 @@ p_load(tidyverse,   # tidy-data
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
-```
-
-#A Train
-
-```{r}
-# Carga de datos train
-
-# Archivo comprimido en el repositorio
-zip_personas <- "03_Stores/train_personas.zip"
-
-# Extración de la carpeta
-unzip(zip_personas, exdir = "03_Stores")
-
-# Carga de BD extraida
-train_personas <- read_csv("03_Stores/train_personas.csv")
+library(httr)
 ```
 
 ```{r}
-#Asignar y cargar las bases de datos Entrenamiento
+## 1. Carga de datos train hogares
 
-train_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_hogares.csv")
-train_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_personas.csv")
+# Definir URL del archivo Excel en GitHub
+url_excel <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/train_hogares.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+train_hogares <- read_csv(temp_file)
+
+
+## 2. Carga de datos train personas
+
+# URL del archivo ZIP en GitHub
+url_zip <- "https://github.com/GeorgeWton1986/T2_BDML/raw/refs/heads/main/03_Stores/train_personas.zip"
+
+# Crear un archivo temporal para almacenar el ZIP
+temp_zip <- tempfile(fileext = ".zip")
+
+# Descargar el archivo ZIP desde GitHub
+GET(url_zip, write_disk(temp_zip, overwrite = TRUE))
+temp_dir <- tempfile()
+dir.create(temp_dir)
+
+# Extraer el contenido del ZIP
+unzip(temp_zip, exdir = temp_dir)
+
+# Leer el archivo CSV extraído
+csv_personas1 <- file.path(temp_dir, "train_personas.csv")
+train_personas <- read_csv(csv_personas1)
+
+## 3. Carga de datos test hogares
+
+# Definir URL del archivo Excel en GitHub
+url_excel_test <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/test_hogares.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel_test, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+test_hogares <- read_csv(temp_file)
+
+## 4. Carga de datos test personas
+
+# Definir URL del archivo Excel en GitHub
+url_excel_test2 <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/test_personas.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel_test2, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+test_personas <- read_csv(temp_file)
 
 ```
 
-##A.1 Base Train Hogares
+
+#### a) Exploración de Base Train Hogares
 
 ```{r}
 #Nombre de las columnas de la base train_hogares
-
 colnames(train_hogares)
 ```
 
@@ -100,11 +137,10 @@ train_hogares <- train_hogares %>%
 table(train_hogares$Pobre,train_hogares$pobre_hand)
 ```
 
-##A.2 Base Train Personas
+#### b) Exploración de Base Train Personas
 
 ```{r}
 #Nombre de las columnas de la base train_personas
-
 colnames(train_personas)
 ```
 
@@ -125,21 +161,11 @@ train_personas_1<- train_personas %>%
   ungroup()
 ```
 
-#B Test
 
-```{r}
-#Asignar y cargar las bases de datos prueba
-
-test_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_hogares.csv")
-test_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_personas.csv")
-
-```
-
-##B.1 Base Test Hogares
+#### c) Exploración de Base Test Hogares
 
 ```{r}
 #Nombre de las columnas de la base test_hogares
-
 colnames(test_hogares)
 ```
 
@@ -327,9 +353,9 @@ test_factors<- test %>%
 
 ```
 
-#2. Modelo de Entrenamiento
+## 3. Modelos y resultados
 
-##2.1 Modelo Elastic Net
+### 3.1 Modelo Elastic Net
 
 ```{r}
 ctrl<- trainControl(method = "cv",
@@ -399,9 +425,7 @@ mod_1_F <- train(Pobre~.,
 mod_1_F
 ```
 
-#3. Entrenamiento Modelo Logit
-
-##3.1 Estimadores logit
+### 3.2 Modelo Logit
 
 ```{r}
 #Calculo de los estimadores Logit
