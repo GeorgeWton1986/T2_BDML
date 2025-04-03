@@ -684,7 +684,6 @@ rforest<-train(Pobre~. ,
                tuneGrid = tunegrid_rf,
                method ="ranger")
 
-
 plot(rforest)
 
 ```
