@@ -666,48 +666,53 @@ set.seed(123)
 summary(train_factors)
 
 # Cross validation- entrenamiento fuera de muestra
-cv10<- trainControl(number = 5, method ="cv")
-
-# Hiperparámetros
-tunegrid_rf<-expand.grid(mtry=c(2,3,4,5, 8), #Predictores aleatorios en cada división                                                del árbol
-                         splitrule= "gini", ##Cambiar por gini y revisar
-                         min.node.size=c(1,2,3,6)) #Tamaño mínimo de los nodos
+crossval<- trainControl(number = 5, method ="cv")
 
 ```
 
 ## 4.2 Entrenamiento modelo Random Forest
 ```{r}
-rforest<-train(Pobre~. ,
-               data=train_factors, 
-               trControl = cv10,
-               metric = "RMSE",
-               tuneGrid = tunegrid_rf,
-               method ="ranger")
-
-plot(rforest)
+randomforest <- train(Pobre~. ,
+               data = train_factors, 
+               method ="ranger",
+               trControl = crossval,
+              tuneGrid = expand.grid(mtry = 4, splitrule = "gini", min.node.size = 1),  
+              num.trees = 500  
+              )
+randomforest
 
 ```
+## 4.3 Predicción con el test set de Random Forest
+```{r}
+# 1. Calcular probabilidades de ser pobre
+predictions <- predict(randomforest, newdata = test_factors, type = "prob")[, 2]  # Probabilidad de ser pobre
+predictions
+# # 2. Convertir probabilidades en 0 o 1 (pobreza predicha)
+# pred_class <- ifelse(predictions > 0.5, 1, 0)
+# 
+# # 3. Crear tabla con predicciones
+# tabla_predicciones <- data.frame(
+#   ID = 1:nrow(test_factors),  
+#   Probabilidad_Pobreza = predictions,  
+#   Pobreza_Predicha = pred_class  
+# )
+# 
+# # 4. Mostrar las primeras 10 filas de la tabla de predicciones
+# head(tabla_predicciones, 10)
+
+```
+
+#
+
+
 
 ```{r}
-pred_train_2_muestra<-predict(rforest, newdata=train_muestra)
-pred_test_2_muestra<-predict(rforest, newdata=test_muestra)
+#  Evaluar el modelo: Precisión (Accuracy)
+accuracy <- mean(pred_class == test_factor$Default)
+print(paste("Precisión del modelo:", round(accuracy * 100, 2), "%"))
 
-##EN MUESTRA
-#Error en porcentaje
-MAPE(y_pred=pred_train_2_muestra, y_true = train_muestra$Pobre)
-
-#Error promedio
-MAE(y_pred=pred_train_2_muestra, y_true = train_muestra$Pobre)
-
-## FUERA DE MUESTRA
-#Error en porcentaje
-MAPE(y_pred=pred_test_2_muestra, y_true = test_muestra$pobre)
-
-#Error promedio
-MAE(y_pred=pred_test_2_muestra, y_true = test_muestra$pobre)
-
-write.csv(pred_train_2_muestra, "Bosques_Train.csv")
-write.csv(pred_test_2_muestra, "Bosques_Test.csv")
+# Si es regresión, calcular el Error Medio Absoluto (MAE)
+mae <- mean(abs(predictions - test_factor$Default))
+print(paste("Error Medio Absoluto:", round(mae, 2)))
 ```
-
 
