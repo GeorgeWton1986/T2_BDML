@@ -23,15 +23,14 @@ require(MLmetrics)
 ```{r}
 #Asignar y cargar las bases de datos Entrenamiento
 
-train_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_hogares.csv")
-train_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/train_personas.csv")
+train_hogares<-read.csv("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/train_hogares.csv")
+train_personas<-read.csv("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/train_personas.csv")
 
 ```
 
 ##A.1 Base Train Hogares
 ```{r}
 #Nombre de las columnas de la base train_hogares
-
 colnames(train_hogares)
 ```
 
@@ -86,8 +85,8 @@ train_personas_1<- train_personas %>%
 ```{r}
 #Asignar y cargar las bases de datos prueba
 
-test_hogares<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_hogares.csv")
-test_personas<-read.csv("/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/test_personas.csv")
+test_hogares<-read.csv("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/test_hogares.csv")
+test_personas<-read.csv("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/test_personas.csv")
 
 ```
 
@@ -187,7 +186,7 @@ filter_train_personas_hogar<- clear_train_personas %>%
 colnames(filter_train_personas_hogar)
 ```
 
-##1.3 Argupar y unir Test Personas
+##1.3 Agrupar y unir Test Personas
 ```{r}
 #Agrupar la prueba de la base personas a nivel hogar y unir las bases de datos por medio de id.
 
@@ -656,8 +655,60 @@ summary(predictSample_EN)  # Estadísticas básicas
 head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 ```
 
+# 4. Entrenamiento Ramdon Forest
+
+## 4.1 Entrenamiento fuera de muestra Random Forest
+```{r}
+# Fijar semilla
+set.seed(123)
+
+# Resumen de los datos entrenamiento
+summary(train_factors)
+
+# Cross validation- entrenamiento fuera de muestra
+cv10<- trainControl(number = 5, method ="cv")
+
+# Hiperparámetros
+tunegrid_rf<-expand.grid(mtry=c(2,3,4,5, 8), #Predictores aleatorios en cada división                                                del árbol
+                         splitrule= "gini", ##Cambiar por gini y revisar
+                         min.node.size=c(1,2,3,6)) #Tamaño mínimo de los nodos
+
+```
+
+## 4.2 Entrenamiento modelo Random Forest
+```{r}
+rforest<-train(Pobre~. ,
+               data=train_factors, 
+               trControl = cv10,
+               metric = "RMSE",
+               tuneGrid = tunegrid_rf,
+               method ="ranger")
 
 
+plot(rforest)
 
+```
+
+```{r}
+pred_train_2_muestra<-predict(rforest, newdata=train_muestra)
+pred_test_2_muestra<-predict(rforest, newdata=test_muestra)
+
+##EN MUESTRA
+#Error en porcentaje
+MAPE(y_pred=pred_train_2_muestra, y_true = train_muestra$Pobre)
+
+#Error promedio
+MAE(y_pred=pred_train_2_muestra, y_true = train_muestra$Pobre)
+
+## FUERA DE MUESTRA
+#Error en porcentaje
+MAPE(y_pred=pred_test_2_muestra, y_true = test_muestra$pobre)
+
+#Error promedio
+MAE(y_pred=pred_test_2_muestra, y_true = test_muestra$pobre)
+
+write.csv(pred_train_2_muestra, "Bosques_Train.csv")
+write.csv(pred_test_2_muestra, "Bosques_Test.csv")
+```
 
 
