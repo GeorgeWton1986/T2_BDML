@@ -792,3 +792,98 @@ plot(varImp(cv_rf), top = 10)
 
 ```
 
+##5. Entrenamiento Boosting
+
+```{r}
+#Cargar librerías 
+require("pacman")
+p_load(
+  ranger, # Para bagging y random forest
+  randomForest, # Para random forest
+  tidyverse, # tidy-data
+  caret ,  # for model training and tunning
+  Metrics, ## Evaluation Metrics for ML
+  adabag,
+  fastDummies
+  )   
+```
+
+## 5.1. AdaBoost
+
+```{r}
+fiveStats <- function(...) {
+  c(
+    caret::twoClassSummary(...), # Returns ROC, Sensitivity, and Specificity
+    caret::defaultSummary(...)  # Returns RMSE and R-squared (for regression) or Accuracy and Kappa (for classification)
+  )
+}
+                                                                        
+
+ctrl<- trainControl(method = "cv",
+                     number = 5,
+                     summaryFunction = fiveStats,
+                     classProbs = TRUE, 
+                     verbose=FALSE,
+                     savePredictions = T)
+```
+
+```{r}
+adagrid<-  expand.grid(
+              mfinal = c( 50, 100),
+              maxdepth = c(1,2),
+              coeflearn = c('Breiman'))
+```
+
+```{r}
+train$Pobre <- as.factor(train$Pobre)
+levels(train$Pobre) <- c("No", "Si")
+
+str(train$Pobre)
+
+```
+
+```{r}
+train$Dominio <- as.factor(train$Dominio)
+
+```
+
+
+```{r}
+set.seed(123)  # Para reproducibilidad
+
+adaboost_tree <- train(Pobre ~ .,  
+  data = train,
+  method = "AdaBoost.M1",
+  trControl = ctrl,
+  metric = "ROC",
+  tuneGrid = adagrid
+)
+
+print(adaboost_tree)
+```
+
+```{r}
+set.seed(123)  # Para reproducibilidad
+
+adaboost_tree <- train(Pobre ~ . -Dominio,  # Quitamos Dominio
+  data = train, 
+  method = "AdaBoost.M1",  
+  trControl = ctrl,
+  metric = "ROC",
+  tuneGrid = adagrid
+)
+
+adaboost_tree
+
+```
+
+```{r}
+default<- ifelse(test$Default=="Si",1,0)
+pred_prob <- predict(adaboost_tree,
+                     newdata = test, 
+                     type = "prob")   
+
+
+aucval_AdaBoost <- Metrics::auc(actual = default,predicted = pred_prob[,2])
+aucval_AdaBoost
+```
