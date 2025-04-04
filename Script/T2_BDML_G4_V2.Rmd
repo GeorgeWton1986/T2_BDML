@@ -657,7 +657,7 @@ head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 
 # 4. Entrenamiento Ramdon Forest
 
-## 4.1 Entrenamiento Random Forest
+## 4.1 Entrenamiento modelo con randomForest (sin crossvalidation)
 ```{r}
 randomforest <- randomForest::randomForest(Pobre ~ . ,
                data = train_factors, 
@@ -669,8 +669,13 @@ randomforest <- randomForest::randomForest(Pobre ~ . ,
 print(randomforest)
 
 ```
+```{r}
+# Ver importancia de variables
+randomForest::varImpPlot(randomforest)
+```
 
-## 4.2 Arreglo base test_factors
+
+## 4.2 Ajustar la base test_factors
 ```{r}
 # Verificar si 'Pobre' falta en test_factors y agregarlo correctamente
 if (!("Pobre" %in% names(test_factors))) {
@@ -698,38 +703,92 @@ table(test_factors$Pobre, useNA = "always")
 
 ```
 
-## 4.3 Predicción con el test set de Random Forest
+## 4.3 Predicción con el modelo Random Forest
 ```{r}
-# Calcular probabilidades (funciona)
-test_factors$Pobre <- predict(randomforest, newdata = test_factors)
-table(test_factors$Pobre, useNA = "always")
+
+# Predicciones con randomForest
+rf_pred_probs <- predict(randomforest, newdata = test_factors, type = "prob")
+rf_pred_classes <- predict(randomforest, newdata = test_factors)
+table(rf_pred_classes)
 
 ```
 
-## 4.4 Entrenamiento fuera de muestra Random Forest
+## 4.4 Entrenamiento fuera de muestra cross validation con ranger
 ```{r}
 # Fijar semilla
 set.seed(123)
 
-control <- trainControl(method = "cv", number = 5)
-modelo_rf_cv <- train(Pobre ~ ., data = train_factors,
-                      method = "rf",
-                      trControl = control,
-                      tuneGrid = expand.grid(mtry = 4),
-                      ntree = 500)
+fiveStats <- function(...) {
+  c(
+    caret::twoClassSummary(...),  # ROC, Sensibilidad, Especificidad
+    caret::defaultSummary(...)    # Accuracy y Kappa
+  )
+}
 
-print(modelo_rf_cv)
+ctrl <- trainControl(
+  method = "cv",             # cross validation
+  number = 5,                
+  summaryFunction = fiveStats,
+  classProbs = TRUE,         #probabilidades
+  verbose = FALSE,
+  savePredictions = TRUE
+)
+
+# Definimos el grid sobre la que se realizará la busqueda de hiperparámetros
+mtry_grid <- expand.grid(
+  mtry = 4,
+  splitrule = "gini",
+  min.node.size = 1
+)
+
 ```
 
-## 4.5 Evaluar el modelo
+## 4.5 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
 
 ```{r}
-#  Evaluar el modelo: Precisión (Accuracy)
-accuracy <- mean(pred_class == test_factor$Default)
-print(paste("Precisión del modelo:", round(accuracy * 100, 2), "%"))
+set.seed(123)
 
-# Si es regresión, calcular el Error Medio Absoluto (MAE)
-mae <- mean(abs(predictions - test_factor$Default))
-print(paste("Error Medio Absoluto:", round(mae, 2)))
+cv_rf <- train(
+  Pobre ~ ., 
+  data = train_factors,
+  method = "ranger",
+  metric = "ROC",          
+  tuneGrid = mtry_grid,
+  trControl = ctrl,
+  num.trees = 500,
+  importance = "impurity"  # Para calcular importancia de variables
+)
+
+print(cv_rf)
+
+
+```
+
+## 4 Predicciones con ranger y randomForest
+```{r}
+# Predicciones con ranger
+ranger_pred_probs <- predict(cv_rf, newdata = test_factors, type = "prob")
+ranger_pred_classes <- predict(cv_rf, newdata = test_factors)
+table(ranger_pred_classes)
+
+# Comparar AUC de ambos modelos
+library(Metrics)
+
+auc_rf <- auc(actual = ifelse(test_factors$Pobre == "Yes", 1, 0),
+              predicted = rf_pred_probs[, "Yes"])
+
+auc_ranger <- auc(actual = ifelse(test_factors$Pobre == "Yes", 1, 0),
+                  predicted = ranger_pred_probs$Yes)
+
+# Mostrar resultados
+print(paste("AUC RandomForest: ", auc_rf))
+print(paste("AUC Ranger (CV): ", auc_ranger))
+
+
+```
+```{r}
+# Ver importancia de variables en ranger
+plot(varImp(cv_rf), top = 10)
+
 ```
 
