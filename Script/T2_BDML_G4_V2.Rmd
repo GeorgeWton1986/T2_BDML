@@ -657,54 +657,72 @@ head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 
 # 4. Entrenamiento Ramdon Forest
 
-## 4.1 Entrenamiento fuera de muestra Random Forest
+## 4.1 Entrenamiento Random Forest
+```{r}
+randomforest <- randomForest::randomForest(Pobre ~ . ,
+               data = train_factors, 
+               mtry = 4,  # Valor óptimo encontrado en CV
+               ntree = 500,  # Número de árboles
+               importance = TRUE)  # Para ver la importancia de variables
+          
+# Ver resultados
+print(randomforest)
+
+```
+
+## 4.2 Arreglo base test_factors
+```{r}
+# Verificar si 'Pobre' falta en test_factors y agregarlo correctamente
+if (!("Pobre" %in% names(test_factors))) {
+  test_factors$Pobre <- factor(NA, levels = levels(train_factors$Pobre))
+}
+
+# Asegurar que test_factors tenga todas las variables de train_factors
+missing_vars <- setdiff(names(train_factors), names(test_factors))
+for (var in missing_vars) {
+  test_factors[[var]] <- NA  
+}
+
+# Reordenar columnas para que coincidan
+test_factors <- test_factors[, names(train_factors), drop = FALSE]
+
+# Ajustar niveles de factores
+for (col in names(test_factors)) {
+  if (is.factor(train_factors[[col]])) {
+    test_factors[[col]] <- factor(test_factors[[col]], levels = levels(train_factors[[col]]))
+  }
+}
+
+# Verificar si Pobre ya no es puro NA
+table(test_factors$Pobre, useNA = "always")
+
+```
+
+## 4.3 Predicción con el test set de Random Forest
+```{r}
+# Calcular probabilidades (funciona)
+test_factors$Pobre <- predict(randomforest, newdata = test_factors)
+table(test_factors$Pobre, useNA = "always")
+
+```
+
+## 4.4 Entrenamiento fuera de muestra Random Forest
 ```{r}
 # Fijar semilla
 set.seed(123)
 
-# Resumen de los datos entrenamiento
-summary(train_factors)
+control <- trainControl(method = "cv", number = 5)
 
-# Cross validation- entrenamiento fuera de muestra
-crossval<- trainControl(number = 5, method ="cv")
+# Entrenar modelo con CV
+modelo_cv <- train(Pobre ~ ., data = train_factors,
+                   method = "rf",
+                   trControl = control,
+                   tuneGrid = data.frame(mtry = 4))
 
+print(modelo_cv)
 ```
 
-## 4.2 Entrenamiento modelo Random Forest
-```{r}
-randomforest <- train(Pobre~. ,
-               data = train_factors, 
-               method ="ranger",
-               trControl = crossval,
-              tuneGrid = expand.grid(mtry = 4, splitrule = "gini", min.node.size = 1),  
-              num.trees = 500  
-              )
-randomforest
-
-```
-## 4.3 Predicción con el test set de Random Forest
-```{r}
-# 1. Calcular probabilidades de ser pobre
-predictions <- predict(randomforest, newdata = test_factors, type = "prob")[, 2]  # Probabilidad de ser pobre
-predictions
-# # 2. Convertir probabilidades en 0 o 1 (pobreza predicha)
-# pred_class <- ifelse(predictions > 0.5, 1, 0)
-# 
-# # 3. Crear tabla con predicciones
-# tabla_predicciones <- data.frame(
-#   ID = 1:nrow(test_factors),  
-#   Probabilidad_Pobreza = predictions,  
-#   Pobreza_Predicha = pred_class  
-# )
-# 
-# # 4. Mostrar las primeras 10 filas de la tabla de predicciones
-# head(tabla_predicciones, 10)
-
-```
-
-#
-
-
+## 4.5 Evaluar el modelo
 
 ```{r}
 #  Evaluar el modelo: Precisión (Accuracy)
