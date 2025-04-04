@@ -712,14 +712,13 @@ table(test_factors$Pobre, useNA = "always")
 set.seed(123)
 
 control <- trainControl(method = "cv", number = 5)
+modelo_rf_cv <- train(Pobre ~ ., data = train_factors,
+                      method = "rf",
+                      trControl = control,
+                      tuneGrid = expand.grid(mtry = 4),
+                      ntree = 500)
 
-# Entrenar modelo con CV
-modelo_cv <- train(Pobre ~ ., data = train_factors,
-                   method = "rf",
-                   trControl = control,
-                   tuneGrid = data.frame(mtry = 4))
-
-print(modelo_cv)
+print(modelo_rf_cv)
 ```
 
 ## 4.5 Evaluar el modelo
