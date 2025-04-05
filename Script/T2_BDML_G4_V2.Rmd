@@ -708,12 +708,45 @@ table(test_factors$Pobre, useNA = "always")
 
 # Predicciones con randomForest
 rf_pred_probs <- predict(randomforest, newdata = test_factors, type = "prob")
+rf_pred_probs
 rf_pred_classes <- predict(randomforest, newdata = test_factors)
 table(rf_pred_classes)
 
 ```
 
-## 4.4 Entrenamiento fuera de muestra cross validation con ranger
+## 4.4 Predición Random Forest con el Test Set/Clasificacion
+
+```{r}
+#Prediccion el Test Set
+predictTest_rf <- test_factors %>% 
+  mutate(
+    prob_pobre_rf= predict(randomforest, 
+                         newdata = test_factors, 
+                         type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
+    pred_pobre_cat_rf = ifelse(prob_pobre_rf > 0.5, "Yes", "No"), #Cambio del umbral de referencia
+    pred_pobre_rf = ifelse(pred_pobre_cat_rf == "Yes", 1, 0)# Predicción numérica (1/0)
+  )
+
+# Resumen
+summary(predictTest_rf$prob_pobre_rf)
+table(predictTest_rf$pred_pobre_cat_rf)
+table(predictTest_rf$pred_pobre_rf)
+
+# Guardar los resultados
+resultados_prediccion_rf<- predictTest_rf %>%
+  select(id, pred_pobre_rf)
+
+# Ver las primeras filas de los resultados
+head(resultados_prediccion_rf)
+```
+
+## 4.5 Template_RF
+```{r}
+## Template_RF
+write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/040425sample_equipo4_rf.csv", row.names = FALSE)
+```
+
+## 4.6 Entrenamiento fuera de muestra cross validation con ranger
 ```{r}
 # Fijar semilla
 set.seed(123)
@@ -725,7 +758,7 @@ fiveStats <- function(...) {
   )
 }
 
-ctrl <- trainControl(
+ctrl_rf_cv <- trainControl(
   method = "cv",             # cross validation
   number = 5,                
   summaryFunction = fiveStats,
@@ -743,52 +776,86 @@ mtry_grid <- expand.grid(
 
 ```
 
-## 4.5 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
+## 4.7 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
+
 
 ```{r}
-set.seed(123)
+# Eliminar municipio 
+train_factors <- train_factors %>% 
+  select(-Dominio, -id)
+
 
 cv_rf <- train(
-  Pobre ~ ., 
+  Pobre ~ .,
   data = train_factors,
   method = "ranger",
-  metric = "ROC",          
+  metric = "ROC",
   tuneGrid = mtry_grid,
-  trControl = ctrl,
+  trControl = ctrl_rf_cv,
   num.trees = 500,
   importance = "impurity"  # Para calcular importancia de variables
 )
 
 print(cv_rf)
 
-
 ```
 
-## 4 Predicciones con ranger y randomForest
+## 4.8 Predicciones con ranger y randomForest
 ```{r}
-# Predicciones con ranger
-ranger_pred_probs <- predict(cv_rf, newdata = test_factors, type = "prob")
-ranger_pred_classes <- predict(cv_rf, newdata = test_factors)
-table(ranger_pred_classes)
+#Prediccion el Test Set
+predictTest_rf_cv <- test_factors %>% 
+  mutate(
+    prob_pobre_rf_cv = predict(cv_rf, 
+                         newdata = test_factors, 
+                         type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
+    
+    pred_pobre_cat_rf_cv = ifelse(prob_pobre_rf_cv > 0.5, "Yes", "No"), #Cambio del umbral de referencia
+    pred_pobre_rf_cv = ifelse(pred_pobre_cat_rf_cv == "Yes", 1, 0)# Predicción numérica (1/0)
+  )
 
-# Comparar AUC de ambos modelos
-library(Metrics)
+# Resumen
+summary(predictTest_rf_cv$prob_pobre_rf_cv)
+table(predictTest_rf_cv$pred_pobre_cat_rf_cv)
+table(predictTest_rf_cv$pred_pobre_rf_cv)
 
-auc_rf <- auc(actual = ifelse(test_factors$Pobre == "Yes", 1, 0),
-              predicted = rf_pred_probs[, "Yes"])
+# Guardar los resultados
+resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
+   select(id, pred_pobre_rf_cv)
 
-auc_ranger <- auc(actual = ifelse(test_factors$Pobre == "Yes", 1, 0),
-                  predicted = ranger_pred_probs$Yes)
-
-# Mostrar resultados
-print(paste("AUC RandomForest: ", auc_rf))
-print(paste("AUC Ranger (CV): ", auc_ranger))
-
+# Ver las primeras filas de los resultados
+head(resultados_prediccion_rf_cv)
 
 ```
 ```{r}
 # Ver importancia de variables en ranger
 plot(varImp(cv_rf), top = 10)
+
+```
+## 4.5 Template_RF_CV
+
+```{r}
+## Template_RF
+write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/050425sample_equipo4_rf_cv.csv", row.names = FALSE)
+```
+
+```{r}
+# Comparar AUC de ambos modelos
+
+# Modelo RandomForest (sin CV)
+aucval_rf <- Metrics::auc(
+  actual = predictTest_rf$pred_pobre_rf,          
+  predicted = predictTest_rf$prob_pobre_rf        
+)
+
+# Modelo RandomForest (con CV - ranger)
+aucval_rf_cv <- Metrics::auc(
+  actual = predictTest_rf_cv$pred_pobre_rf_cv,         
+  predicted = predictTest_rf_cv$prob_pobre_rf_cv    
+)
+
+# Mostrar resultados
+print(paste("AUC RandomForest: ", round(aucval_rf, 4)))
+print(paste("AUC Ranger (CV): ", round(aucval_rf_cv, 4)))
 
 ```
 
