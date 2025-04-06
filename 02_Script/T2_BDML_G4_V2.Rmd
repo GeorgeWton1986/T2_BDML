@@ -1034,84 +1034,54 @@ table(resultados_prediccion_xgboost_2$Pobre)
 write.csv(resultados_prediccion_xgboost_2, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost2.csv", row.names = FALSE)
 ```
 
-## 5.1. AdaBoost
+#5.2. Gradient Boosting
 
 ```{r}
-fiveStats <- function(...) {
-  c(
-    caret::twoClassSummary(...), # Returns ROC, Sensitivity, and Specificity
-    caret::defaultSummary(...)  # Returns RMSE and R-squared (for regression) or Accuracy and Kappa (for classification)
-  )
-}
-                                                                        
+p_load(gbm)
 
-ctrl<- trainControl(method = "cv",
-                     number = 5,
-                     summaryFunction = fiveStats,
-                     classProbs = TRUE, 
-                     verbose=FALSE,
-                     savePredictions = T)
+
+grid_gbm <- expand.grid(
+  n.trees = c(100, 200, 300),
+  interaction.depth = c(3, 4),
+  shrinkage = c(0.1),
+  n.minobsinnode = c(5, 10)
+)
 ```
 
 ```{r}
-adagrid<-  expand.grid(
-              mfinal = c( 50, 100),
-              maxdepth = c(1,2),
-              coeflearn = c('Breiman'))
-```
-
-```{r}
-train$Pobre <- as.factor(train$Pobre)
-levels(train$Pobre) <- c("No", "Si")
-
-str(train$Pobre)
-
-```
-
-```{r}
-train$Dominio <- as.factor(train$Dominio)
-
-```
-
-```{r}
-set.seed(123)  # Para reproducibilidad
-
-adaboost_tree <- train(Pobre ~ .,  
-  data = train,
-  method = "AdaBoost.M1",
-  trControl = ctrl,
-  metric = "ROC",
-  tuneGrid = adagrid
+# Definir control de entrenamiento específico para gbm
+ctrl_gbm <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
 )
 
-print(adaboost_tree)
-```
-
-```{r}
-set.seed(123)  # Para reproducibilidad
-
-adaboost_tree <- train(Pobre ~ . -Dominio,  # Quitamos Dominio
-  data = train, 
-  method = "AdaBoost.M1",  
-  trControl = ctrl,
+set.seed(123) # important set seed. 
+gbm_tree <- train(Pobre ~ .,
+  data = train_factors, 
+  method = "gbm", 
+  trControl = ctrl_gbm,
+  tuneGrid=grid_gbm,
   metric = "ROC",
-  tuneGrid = adagrid
-)
-
-adaboost_tree
-
+  verbose = FALSE
+)            
+gbm_tree
 ```
 
 ```{r}
-default<- ifelse(test$Default=="Si",1,0)
-pred_prob <- predict(adaboost_tree,
-                     newdata = test, 
-                     type = "prob")   
-
-
-aucval_AdaBoost <- Metrics::auc(actual = default,predicted = pred_prob[,2])
-aucval_AdaBoost
+pred_prob_gbm <- predict(gbm_tree, newdata = test_factors, type = "prob")
+pred_clase_gbm <- ifelse(pred_prob_gbm[,"Yes"] > 0.5, 1, 0)
+predicciones_kaggle_gbm <- data.frame(id = test$id, Pobre = pred_clase_gbm)
+table(predicciones_kaggle_gbm$Pobre)
 ```
+
+```{r}
+setwd("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning")
+# Exportar a CSV sin row.names
+write.csv(predicciones_kaggle_gbm, "kaggle_submission_gbm.csv", row.names = FALSE)
+```
+
 
 # 6. Entrenamiento algoritmo Caret
 
