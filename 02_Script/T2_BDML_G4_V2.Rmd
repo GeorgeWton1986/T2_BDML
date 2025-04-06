@@ -13,11 +13,70 @@ p_load(tidyverse, # tidy-data
        glmnet, # To implement regularization algorithms. 
        caret, # creating predictive models
        BiocManager,
-       Metrics
-)
+       Metrics,
+       readr,
+       utils)
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
+```
+
+```{r}
+## 1. Carga de datos train hogares
+
+# Definir URL del archivo Excel en GitHub
+url_excel <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/train_hogares.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+train_hogares <- read_csv(temp_file)
+
+## 2. Carga de datos train personas
+
+# URL del archivo ZIP en GitHub
+url_zip <- "https://github.com/GeorgeWton1986/T2_BDML/raw/refs/heads/main/03_Stores/train_personas.zip"
+
+# Crear un archivo temporal para almacenar el ZIP
+temp_zip <- tempfile(fileext = ".zip")
+
+# Descargar el archivo ZIP desde GitHub
+GET(url_zip, write_disk(temp_zip, overwrite = TRUE))
+temp_dir <- tempfile()
+dir.create(temp_dir)
+
+# Extraer el contenido del ZIP
+unzip(temp_zip, exdir = temp_dir)
+
+# Leer el archivo CSV extraído
+csv_personas1 <- file.path(temp_dir, "train_personas.csv")
+train_personas <- read_csv(csv_personas1)
+
+## 3. Carga de datos test hogares
+
+# Definir URL del archivo Excel en GitHub
+url_excel_test <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/test_hogares.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel_test, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+test_hogares <- read_csv(temp_file)
+
+## 4. Carga de datos test personas
+
+# Definir URL del archivo Excel en GitHub
+url_excel_test2 <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/test_personas.csv"
+
+# Descargar el archivo temporalmente
+temp_file <- tempfile(fileext = ".csv")
+GET(url_excel_test2, write_disk(temp_file, overwrite = TRUE))
+
+# Leer el archivo CSV en un dataframe
+test_personas <- read_csv(temp_file)
 ```
 
 #A Train
