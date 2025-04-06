@@ -19,7 +19,9 @@ p_load(tidyverse, # tidy-data
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
 ```
-#A Train 
+
+#A Train
+
 ```{r}
 #Asignar y cargar las bases de datos Entrenamiento
 
@@ -29,6 +31,7 @@ train_personas<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Econom�
 ```
 
 ##A.1 Base Train Hogares
+
 ```{r}
 #Nombre de las columnas de la base train_hogares
 colnames(train_hogares)
@@ -58,6 +61,7 @@ table(train_hogares$Pobre,train_hogares$pobre_hand)
 ```
 
 ##A.2 Base Train Personas
+
 ```{r}
 #Nombre de las columnas de la base train_personas
 
@@ -82,6 +86,7 @@ train_personas_1<- train_personas %>%
 ```
 
 #B Test
+
 ```{r}
 #Asignar y cargar las bases de datos prueba
 
@@ -91,6 +96,7 @@ test_personas<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Economí
 ```
 
 ##B.1 Base Test Hogares
+
 ```{r}
 #Nombre de las columnas de la base test_hogares
 
@@ -104,8 +110,8 @@ test_hogares %>%
   head()
 ```
 
-
 ##B.2 Base Test Personas
+
 ```{r}
 #Nombre de las columnas de la base test_personas
 
@@ -159,6 +165,7 @@ colnames(clear_test_personas)
 ```
 
 ##1.2 Argupar y unir Train Personas
+
 ```{r}
 #Agrupar el entrenamiento de la base personas a nivel hogar y unir las bases de datos por medio de id.
 
@@ -182,11 +189,13 @@ filter_train_personas_hogar<- clear_train_personas %>%
                          H_Head_ocupado=ocupado) %>% 
                     left_join(summary_train_personas_nivel_hogar)
 ```
+
 ```{r}
 colnames(filter_train_personas_hogar)
 ```
 
 ##1.3 Agrupar y unir Test Personas
+
 ```{r}
 #Agrupar la prueba de la base personas a nivel hogar y unir las bases de datos por medio de id.
 
@@ -211,10 +220,13 @@ filter_test_personas_hogar<- clear_test_personas %>%
                          H_Head_ocupado=ocupado) %>% 
                     left_join(summary_test_personas_nivel_hogar, by = "id")
 ```
+
 ```{r}
 colnames(filter_test_personas_hogar)
 ```
+
 ##1.4 Base de trabajo Train Hogares
+
 ```{r}
 clear_train_hogares<- train_hogares %>% 
   mutate(pagada= ifelse(P5090==1,1,0),
@@ -226,6 +238,7 @@ clear_train_hogares<- train_hogares %>%
 ```
 
 ##1.5 Base de trabajo Test Hogares
+
 ```{r}
 clear_test_hogares<- test_hogares %>% 
   mutate(pagada= ifelse(P5090==1,1,0),
@@ -237,6 +250,7 @@ clear_test_hogares<- test_hogares %>%
 ```
 
 ##1.6 Consolidar las BD Train y Test Hogares
+
 ```{r}
 train<- clear_train_hogares %>% 
           left_join(filter_train_personas_hogar) %>% 
@@ -246,7 +260,9 @@ test<- clear_test_hogares %>%
           left_join(filter_test_personas_hogar)
 
 ```
+
 ##1.7 Conversion a factores
+
 ```{r}
 train_factors<- train %>% 
   mutate(Dominio=factor(Dominio),
@@ -274,6 +290,7 @@ test_factors<- test %>%
 #2. Entrenamiento Modelo Elastic Net
 
 ##2.1 Modelo Elastic Net
+
 ```{r}
 
 ctrl<- trainControl(method = "cv",
@@ -299,11 +316,15 @@ mod_1_EN <- train(Pobre~.,#Modelo 1 Elastic Net
                
 )
 ```
+
 ##2.2 Resultado_EN
+
 ```{r}
 mod_1_EN
 ```
+
 ##2.2 Modelo F1
+
 ```{r}
 p_load(Metrics)
 fiveStats <- function(...)  c(prSummary(...))  
@@ -332,13 +353,17 @@ mod_1_F <- train(Pobre~.,
 
 )
 ```
+
 ##2.4 Resultado_F1
+
 ```{r}
 mod_1_F
 ```
+
 #3. Entrenamiento Modelo Logit
 
 ##3.1 Estimadores logit
+
 ```{r}
 #Calculo de los estimadores Logit
 mod_1_logit<- glm(Pobre~., 
@@ -347,12 +372,14 @@ mod_1_logit<- glm(Pobre~.,
 
 ```
 
-##3.2 Resultados Estimadores Logit 
+##3.2 Resultados Estimadores Logit
+
 ```{r}
 summary(mod_1_logit,type="text")
 ```
 
 ##3.3 Probabilidad Logit
+
 ```{r}
 #Calculo de probabilidades
 prob_logit<- train_factors %>% 
@@ -364,12 +391,14 @@ prob_logit<- train_factors %>%
 ```
 
 ## 3.4 Resultado Probabilidad Logit
+
 ```{r}
 head(prob_logit %>% 
        select(Pobre,prob_hat))
 ```
 
 ## 3.5 Clasificador Logit
+
 ```{r}
 
 rule <- 0.4 # Bayes Rule
@@ -383,6 +412,7 @@ head(prob_logit %>%
 ```
 
 ##3.6.1 Matriz de confusion
+
 ```{r}
 # Convertir la variable Pred_pobre a factor con etiquetas descriptivas
 prob_logit$pred_pobre_factor <- factor(prob_logit$pred_pobre,
@@ -421,6 +451,7 @@ print(counts_table)
 ```
 
 ##3.6.2 Metricas Modelo Logit
+
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -469,6 +500,7 @@ print(metrics_table_mod_1_log)
 ```
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
+
 ```{r}
 ctrl<- trainControl(method = "cv",
                     number = 5,
@@ -479,6 +511,7 @@ ctrl<- trainControl(method = "cv",
 ```
 
 ##3.8 Entrenamiento modelo 2
+
 ```{r}
 set.seed(123)
 mod_2_logit <- train(Pobre~. ,
@@ -499,6 +532,7 @@ head(mod_2_logit$pred)
 ```
 
 ##3.9 Matriz de confusion modelo 2
+
 ```{r}
 #Matriz de confusion del modelo de entrenamiento
 B <- confusionMatrix(mod_2_logit)
@@ -530,6 +564,7 @@ print(metrics_table_mod_2_log)
 ```
 
 ##3.10 Explorar la importancia de las variables
+
 ```{r}
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
@@ -537,7 +572,8 @@ print(importancia)
 plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
-##3.11 Predición con el Test Set/Clasificacion 
+##3.11 Predición con el Test Set/Clasificacion
+
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
@@ -566,6 +602,7 @@ head(resultados_prediccion)
 ```
 
 ##3.12 Gráficos de la predicción
+
 ```{r}
 # Generación de predicciones
 predictTest_logit <- test_factors %>% 
@@ -611,6 +648,7 @@ head(resultados_prediccion)
 ```
 
 ##3.12 Template_Logit
+
 ```{r}
 write.csv(resultados_prediccion, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
 ```
@@ -618,6 +656,7 @@ write.csv(resultados_prediccion, "/Users/jorgeviafara/Library/CloudStorage/OneDr
 #3 Predicciones
 
 ##3.1 Predicción_EN
+
 ```{r}
 
 predictSample_EN <- test_factors   %>% 
@@ -644,6 +683,7 @@ head(predictSample_EN)
 ```
 
 ##3.2 Template_EN
+
 ```{r}
 write.csv(predictSample_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_EN.csv", row.names = FALSE)
 
@@ -658,6 +698,7 @@ head(predictSample_EN, 10)  # Muestra las primeras 10 filas
 # 4. Entrenamiento Ramdon Forest
 
 ## 4.1 Entrenamiento modelo con randomForest (sin crossvalidation)
+
 ```{r}
 randomforest <- randomForest::randomForest(Pobre ~ . ,
                data = train_factors, 
@@ -669,13 +710,14 @@ randomforest <- randomForest::randomForest(Pobre ~ . ,
 print(randomforest)
 
 ```
+
 ```{r}
 # Ver importancia de variables
 randomForest::varImpPlot(randomforest)
 ```
 
-
 ## 4.2 Ajustar la base test_factors
+
 ```{r}
 # Verificar si 'Pobre' falta en test_factors y agregarlo correctamente
 if (!("Pobre" %in% names(test_factors))) {
@@ -704,6 +746,7 @@ table(test_factors$Pobre, useNA = "always")
 ```
 
 ## 4.3 Predicción con el modelo Random Forest
+
 ```{r}
 
 # Predicciones con randomForest
@@ -741,12 +784,14 @@ head(resultados_prediccion_rf)
 ```
 
 ## 4.5 Template_RF
+
 ```{r}
 ## Template_RF
 write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/040425sample_equipo4_rf.csv", row.names = FALSE)
 ```
 
 ## 4.6 Entrenamiento fuera de muestra cross validation con ranger
+
 ```{r}
 # Fijar semilla
 set.seed(123)
@@ -778,7 +823,6 @@ mtry_grid <- expand.grid(
 
 ## 4.7 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
 
-
 ```{r}
 # Eliminar municipio 
 train_factors <- train_factors %>% 
@@ -801,6 +845,7 @@ print(cv_rf)
 ```
 
 ## 4.8 Predicciones con ranger y randomForest
+
 ```{r}
 #Prediccion el Test Set
 predictTest_rf_cv <- test_factors %>% 
@@ -826,11 +871,13 @@ resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
 head(resultados_prediccion_rf_cv)
 
 ```
+
 ```{r}
 # Ver importancia de variables en ranger
 plot(varImp(cv_rf), top = 10)
 
 ```
+
 ## 4.5 Template_RF_CV
 
 ```{r}
@@ -957,7 +1004,6 @@ train$Dominio <- as.factor(train$Dominio)
 
 ```
 
-
 ```{r}
 set.seed(123)  # Para reproducibilidad
 
@@ -996,4 +1042,66 @@ pred_prob <- predict(adaboost_tree,
 
 aucval_AdaBoost <- Metrics::auc(actual = default,predicted = pred_prob[,2])
 aucval_AdaBoost
+```
+
+# 6. Entrenamiento algoritmo Caret
+
+## 6.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
+
+```{r}
+# Ver importancia de variables
+importancia <- arbol$variable.importance
+print(importancia)
+```
+
+```{r}
+train_factors_model <- train_factors %>% select(-id)
+
+
+
+arbol <- rpart(Pobre ~ Nper + nmujeres + ncotizando + maxEducLevel + nt_trab_semanal 
+               + H_cotizando + nmayor_edad, 
+                       data    = train_factors_model,
+                       method = "class" ## define tree for classification
+                       )
+arbol$control$cp # alpha
+```
+
+```{r}
+prp(arbol, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
+```
+
+## 6.2 Predicción
+
+```{r}
+# variables categóricas del test tengan los mismos niveles y tipos
+test_factors_model <- test %>% 
+  mutate(Dominio=factor(Dominio),
+         pagada=factor(pagada,levels = c(0,1),labels = c("No","Yes")),
+         hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
+         arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
+         usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
+         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
+         H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6), labels = c("Ns", "Ninguno", "Preescolar", "Primaria", "Secundaria", "Media", "Universitaria")),
+         maxEducLevel = factor(maxEducLevel, levels = c(0:6), labels = c("Ns", "Ninguno", "Preescolar", "Primaria", "Secundaria", "Media", "Universitaria"))
+  )
+
+pred_prob_cart <- predict(arbol, newdata = test_factors_model, type = "prob")    ## Predecir la probabilidad (en lugar de la clase)
+```
+
+```{r}
+# Para Kaggle
+ids <- test$id
+
+# Convertir probabilidades 
+pred_binaria <- ifelse(pred_prob_cart[, "Yes"] > 0.5, 1, 0)
+
+
+submission <- data.frame(id = ids, Pobre = pred_clase)
+```
+
+##3.2 Template_CART
+
+```{r}
+write.csv(submission, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/05-04-25_equipo4_cart.csv", row.names = FALSE)
 ```
