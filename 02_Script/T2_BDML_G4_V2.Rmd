@@ -1082,7 +1082,6 @@ setwd("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestr
 write.csv(predicciones_kaggle_gbm, "kaggle_submission_gbm.csv", row.names = FALSE)
 ```
 
-
 # 6. Entrenamiento algoritmo Caret
 
 ## 6.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
@@ -1137,10 +1136,15 @@ pred_binaria <- ifelse(pred_prob_cart[, "Yes"] > 0.5, 1, 0)
 
 
 submission <- data.frame(id = ids, Pobre = pred_clase)
+# 1. Revisa estructura
+str(submission)
 ```
 
 ##3.2 Template_CART
 
 ```{r}
-write.csv(submission, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/05-04-25_equipo4_cart.csv", row.names = FALSE)
+write.csv
+write.csv(submission, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/06-04-25_equipo4_cart.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
 ```
