@@ -24,6 +24,8 @@ require(MLmetrics)
 ```{r}
 ## 1. Carga de datos train hogares
 
+library(httr)
+
 # Definir URL del archivo Excel en GitHub
 url_excel <- "https://raw.githubusercontent.com/GeorgeWton1986/T2_BDML/refs/heads/main/03_Stores/train_hogares.csv"
 
@@ -984,7 +986,14 @@ grid_xgboost
 
 ```{r}
 
-ctrl_xgboost <- trainControl(
+# Calcular proporción de clases para asignar peso
+weight_ratio <- sum(train_factors$Pobre == "No") / sum(train_factors$Pobre == "Yes")
+
+# Crear vector de pesos
+weights <- ifelse(train_factors$Pobre == "Yes", weight_ratio, 1)
+
+# Control de entrenamiento con ROC
+ctrl <- trainControl(
   method = "cv",
   number = 5,
   classProbs = TRUE,                   # Necesario para AUC
@@ -992,15 +1001,16 @@ ctrl_xgboost <- trainControl(
   verboseIter = FALSE
 )
 
-# Entrenar el modelo XGBoost 
+# Entrenar el modelo XGBoost con fórmula directa
 set.seed(123)
 xgb_model <- train(
   Pobre ~ .,                          # Variable objetivo
   data = train_factors,               # Datos de entrenamiento
   method = "xgbTree",
-  trControl = ctrl_xgboost,
+  trControl = ctrl,
   tuneGrid = grid_xgboost,
-  metric = "ROC",                     # Se usa ROC como criterio
+  metric = "ROC",     
+  weights = weights,                  # <--- este es el cambio importante
   verbosity = 0
 )
 
@@ -1012,16 +1022,16 @@ print(xgb_model)
 # Obtener probabilidades
 pred_prob_xgboost <- predict(xgb_model, newdata = test_factors, type = "prob")
 Pobre_binaria_xgboost <- ifelse(pred_prob_xgboost[, "Yes"] >= 0.5, 1, 0)
-resultados_prediccion_xgboost <- data.frame(id = test$id, Pobre = Pobre_binaria_xgboost)
+resultados_prediccion_xgboost_2 <- data.frame(id = test$id, Pobre = Pobre_binaria_xgboost)
 
-table(resultados_prediccion_xgboost$Pobre)
+table(resultados_prediccion_xgboost_2$Pobre)
 
 
 ```
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_xgboost, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost.csv", row.names = FALSE)
+write.csv(resultados_prediccion_xgboost_2, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost2.csv", row.names = FALSE)
 ```
 
 ## 5.1. AdaBoost
