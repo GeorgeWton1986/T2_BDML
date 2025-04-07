@@ -1122,10 +1122,13 @@ print(paste("AUC Ranger (CV): ", round(aucval_rf_cv, 4)))
 
 ```
 
+##7. 
+
 ##5. Entrenamiento Boosting
 
 ##5.1. XGBoost
 
+##5.1.1. Definir Grilla
 ```{r}
 p_load(xgboost)
 
@@ -1139,6 +1142,7 @@ grid_xgboost <- expand.grid(nrounds = c(250,500),
 grid_xgboost
 ```
 
+##5.1.2. Balanceo de pesos
 ```{r}
 
 # Calcular proporción de clases para asignar peso
@@ -1173,6 +1177,7 @@ print(xgb_model)
 
 ```
 
+##5.1.3. Probabilidades XGBoost
 ```{r}
 # Obtener probabilidades
 pred_prob_xgboost <- predict(xgb_model, newdata = test_factors, type = "prob")
@@ -1184,6 +1189,7 @@ table(resultados_prediccion_xgboost_2$Pobre)
 
 ```
 
+##5.1.4. Template XGBoosting
 ```{r}
 ## Template_RF
 write.csv(resultados_prediccion_xgboost_2, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost2.csv", row.names = FALSE)
