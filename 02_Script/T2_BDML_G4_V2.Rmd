@@ -342,10 +342,9 @@ ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.pn
 ```{r}
 #Configacion de la validacion Cruzada
 ctrl_EN<- trainControl(method = "cv",
-                    number = 3,
+                    number = 5,
                     classProbs = TRUE,
                     savePredictions = TRUE,
-                    summaryFunction = twoClassSummary,
                     )
 ```
 
@@ -356,8 +355,8 @@ ctrl_EN<- trainControl(method = "cv",
 # El hipeparametro lambda controla la intensidad de la regularización
 
 grilla_EN <- expand.grid(
-  alpha= c(0.1, 0.3, 0.6,0.9),
-  lambda= 10^seq(-4, -1, length = 10) #Logaritmos
+  alpha= c(0.1, 0.5, 0.9),
+  lambda= 10^seq(-3, -1, length = 5) #Logaritmos
 )
 
 ```
@@ -377,7 +376,6 @@ mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
     metric = "ROC",
     preProcess = c("center","scale"), #Preprocesamiento
-    allowParallel = FALSE  # Desactivar paralelización
     )
 ```
 
@@ -522,10 +520,10 @@ text(x = 1:length(prop_clases_EN),
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
 
+
 #3. Entrenamiento Modelo Logit
 
 ##3.1 Estimadores logit
-
 ```{r}
 #Calculo de los estimadores Logit
 mod_1_logit<- glm(Pobre~., 
@@ -534,14 +532,12 @@ mod_1_logit<- glm(Pobre~.,
 
 ```
 
-##3.2 Resultados Estimadores Logit
-
+##3.2 Resultados Estimadores Logit 
 ```{r}
 summary(mod_1_logit,type="text")
 ```
 
 ##3.3 Probabilidad Logit
-
 ```{r}
 #Calculo de probabilidades
 prob_logit<- train_factors %>% 
@@ -553,14 +549,12 @@ prob_logit<- train_factors %>%
 ```
 
 ## 3.4 Resultado Probabilidad Logit
-
 ```{r}
 head(prob_logit %>% 
        select(Pobre,prob_hat))
 ```
 
 ## 3.5 Clasificador Logit
-
 ```{r}
 
 rule <- 0.4 # Bayes Rule
@@ -574,7 +568,6 @@ head(prob_logit %>%
 ```
 
 ##3.6.1 Matriz de confusion
-
 ```{r}
 # Convertir la variable Pred_pobre a factor con etiquetas descriptivas
 prob_logit$pred_pobre_factor <- factor(prob_logit$pred_pobre,
@@ -601,19 +594,18 @@ FN_train <- A[3]  # Falsos Negativos
 TP_train <- A[4]  # Verdaderos Positivos
 
 # Crear tabla de conteos
-counts_table <- data.frame(
+counts_table_train <- data.frame(
   Categoría = c("Verdaderos Negativos (TN)", "Falsos Positivos (FP)", 
                 "Falsos Negativos (FN)", "Verdaderos Positivos (TP)"),
   Conteo = c(TN_train, FP_train, FN_train, TP_train)
 )
 
-print(counts_table)
+print(counts_table_train)
 
 
 ```
 
 ##3.6.2 Metricas Modelo Logit
-
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -662,25 +654,25 @@ print(metrics_table_mod_1_log)
 ```
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
-
 ```{r}
-ctrl<- trainControl(method = "cv",
+ctrl_logit<- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
                     savePredictions = TRUE,
-                    verbose=T
+                    verbose=TRUE
                     )
 ```
 
 ##3.8 Entrenamiento modelo 2
-
 ```{r}
+#Entrenamiento del modelos Logit 
+#Tiempo de ejecucion 35 seg
 set.seed(123)
 mod_2_logit <- train(Pobre~. ,
                      data = train_factors, 
                      method = "glm",
                      family = "binomial",
-                     trControl = ctrl,
+                     trControl = ctrl_logit,
                      metric = "Accuracy"
                      )
 
@@ -694,39 +686,85 @@ head(mod_2_logit$pred)
 ```
 
 ##3.9 Matriz de confusion modelo 2
-
 ```{r}
-#Matriz de confusion del modelo de entrenamiento
-B <- confusionMatrix(mod_2_logit)
+# Obtener predicciones en los datos de entrenamiento
+predicciones_train_cv <- predict(mod_2_logit, newdata = train_factors)
 
-B <- B$table
+# Matriz de confusión del modelo con validación cruzada
+B_cv <- confusionMatrix(predicciones_train_cv, train_factors$Pobre)
+B_cv <- B_cv$table
+
 
 # Explicacion de valores matriz de confusion
-TN_train_cv <- B[1,1]  # Verdaderos Negativos
-FP_train_cv <- B[2,1]  # Falsos Positivos
-FN_train_cv <- B[1,2]  # Falsos Negativos
-TP_train_cv <- B[2,2]  # Verdaderos Positivos
+TN_train_cv <- B_cv[1,1]  # Verdaderos Negativos
+FP_train_cv <- B_cv[1,2]  # Falsos Positivos
+FN_train_cv <- B_cv[2,1]  # Falsos Negativos
+TP_train_cv <- B_cv[2,2]  # Verdaderos Positivos
+
+# Crear tabla de conteos
+counts_table_cv <- data.frame(
+  categoría = c("Verdaderos Negativos (TN)", "Falsos Positivos (FP)", 
+                "Falsos Negativos (FN)", "Verdaderos Positivos (TP)"),
+  conteo = c(TN_train_cv, FP_train_cv, FN_train_cv, TP_train_cv)
+)
+print(counts_table_cv)
+
+# Calcular el total de observaciones
+total_obs_cv <- sum(counts_table_cv$conteo)
+
+# Añadir porcentajes a la tabla
+counts_table_cv$porcentaje <- sprintf("%.2f%%", 100 * counts_table_cv$conteo / total_obs_cv)
+print(counts_table_cv)
+
+```
+##3.10 Metricas Modelo de Entrenamieno Logit 
+```{r}
+#Métricas derivadas:
+# Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
+# Proporción de predicciones correctas.
+# Precisión (Precision): TP / (TP + FP)
+# De todos los casos predichos como "Pobres", ¿cuántos realmente lo son?
+# Sensibilidad/Recall: TP / (TP + FN)
+# De todos los casos realmente "Pobres", ¿cuántos identificamos correctamente?
+# Especificidad: TN / (TN + FP)
+# De todos los casos realmente "No pobres", ¿cuántos identificamos correctamente?
+# F1-Score: 2 * (Precisión * Recall) / (Precisión + Recall)
+# Media armónica de precisión y recall.
 
 # Calcular métricas
+
+# Accuracy
 accuracy_train_cv <- (TN_train_cv + TP_train_cv) / (TN_train_cv + FP_train_cv + FN_train_cv + TP_train_cv)
+# Precisión
 precision_train_cv <- TP_train_cv / (TP_train_cv + FP_train_cv)
+# Recall (Sensibilidad)
 recall_train_cv <- TP_train_cv / (TP_train_cv + FN_train_cv)
+# Especificidad
 specificity_train_cv <- TN_train_cv / (TN_train_cv + FP_train_cv)
+# F1 Score
 f1_score_train_cv <- 2 * (precision_train_cv * recall_train_cv) / (precision_train_cv + recall_train_cv)
+# Error Rate (Tasa de error)
 error_rate_train_cv <- 1 - accuracy_train_cv
 
-# Crear un data frame con los resultados
+# # Crear tabla de métricas
 metrics_table_mod_2_log <- data.frame(
   metrica_train_cv = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
               "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
-  Valor = c(accuracy_train_cv, precision_train_cv, recall_train_cv, specificity_train_cv, f1_score_train_cv, error_rate_train_cv)
+  Valor = c(accuracy_train_cv, precision_train_cv, recall_train_cv, specificity_train_cv, f1_score_train_cv, error_rate_train_cv),
+    Descripción = c(
+    "Proporción total de predicciones correctas",
+    "De los predichos como pobres, cuántos realmente lo son",
+    "De los realmente pobres, cuántos fueron identificados correctamente",
+    "De los realmente no pobres, cuántos fueron identificados correctamente",
+    "Media armónica entre precisión y recall",
+    "Proporción de predicciones incorrectas"
+  )
 )
 
 print(metrics_table_mod_2_log)
 ```
 
-##3.10 Explorar la importancia de las variables
-
+##3.11 Explorar la importancia de las variables
 ```{r}
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
@@ -734,46 +772,75 @@ print(importancia)
 plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
-##3.11 Predición con el Test Set/Clasificacion
+##3.12 Comparacion entre los modelos 1 y 2
+```{r}
+#Crear un dataframe con los dos modelos y verlos en paralelo
+comparar_df <- data.frame(
+  Métrica = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+              "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
+  Modelo_Original = c(accuracy_train, precision_train, recall_train, 
+                     specificity_train, f1_score_train, error_rate_train),
+  Modelo_CV = c(accuracy_train_cv, precision_train_cv, recall_train_cv, 
+               specificity_train_cv, f1_score_train_cv, error_rate_train_cv),
+  Diferencia = c(accuracy_train_cv - accuracy_train, 
+                precision_train_cv - precision_train,
+                recall_train_cv - recall_train,
+                specificity_train_cv - specificity_train,
+                f1_score_train_cv - f1_score_train,
+                error_rate_train_cv - error_rate_train)
+)
 
+comparar_df$Modelo_Original <- sprintf("%.2f%%", comparar_df$Modelo_Original * 100)
+comparar_df$Modelo_CV <- sprintf("%.2f%%", comparar_df$Modelo_CV * 100)
+comparar_df$Diferencia <- sprintf("%+.2f%%", comparar_df$Diferencia * 100)
+
+print(comparar_df)
+
+```
+
+
+##3.13 Predición con el Test Set/Clasificacion 
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
   mutate(
-    prob_pobre = predict(mod_2_logit, 
+    prob_pobre_logit = predict(mod_2_logit, 
                          newdata = test_factors, 
                          type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
-    pred_pobre_cat = predict(mod_2_logit, 
-                             newdata = test_factors, 
-                             type = "raw"), # Predicción categórica (Yes/No)
-    pred_pobre = ifelse(pred_pobre_cat == "Yes", 1, 0)# Predicción numérica (1/0)
+    pred_pobre_cat_logit = ifelse(prob_pobre_logit > 0.4, "Yes", "No"), #Cambio del umbral de referencia
+    pred_pobre_logit = ifelse(pred_pobre_cat_logit == "Yes", 1, 0)# Predicción numérica (1/0)
   )
 
 # Resumen
-summary(predictTest_logit$prob_pobre)
-table(predictTest_logit$pred_pobre_cat)
-table(predictTest_logit$pred_pobre)
+summary(predictTest_logit$prob_pobre_logit)
+table(predictTest_logit$pred_pobre_cat_logit)
+table(predictTest_logit$pred_pobre_logit)
 
 # Guardar los resultados
-resultados_prediccion<- predictTest_logit %>%
-  select(id, pred_pobre)
+resultados_prediccion_logit<- predictTest_logit %>%
+  select(id, pred_pobre_logit)
 
 # Ver las primeras filas de los resultados
-head(resultados_prediccion)
+head(resultados_prediccion_logit)
+
+# Crear un resumen de las predicciones
+prediccion_test_logit <- data.frame(
+  Estadística = c("Número total de predicciones", 
+                 "Hogares clasificados como pobres", 
+                 "Hogares clasificados como no pobres",
+                 "Porcentaje clasificado como pobre"),
+  Valor = c(nrow(resultados_prediccion_logit),
+           sum(resultados_prediccion_logit$pred_pobre_logit),
+           nrow(resultados_prediccion_logit) - sum(resultados_prediccion_logit$pred_pobre_logit),
+           sprintf("%.2f%%", 100 * sum(resultados_prediccion_logit$pred_pobre_logit) / nrow(resultados_prediccion_logit)))
+)
+
+print(prediccion_test_logit)
 
 ```
 
-##3.12 Gráficos de la predicción
-
+##3.14 Gráficos de la predicción
 ```{r}
-# Generación de predicciones
-predictTest_logit <- test_factors %>% 
-  mutate(
-    prob_pobre = predict(mod_2_logit, newdata = test_factors, type = "prob")[,"Yes"],
-    pred_pobre_cat = predict(mod_2_logit, newdata = test_factors, type = "raw"),
-    pred_pobre = ifelse(pred_pobre_cat == "Yes", 1, 0)
-  )
-
 # Distribucion de probabilidades predichas
 hist(predictTest_logit$prob_pobre, 
      main = "Distribución de probabilidades", 
@@ -783,7 +850,7 @@ hist(predictTest_logit$prob_pobre,
      breaks = 20)  # Puedes ajustar el número de rangos
 
 # Proporción de clases predichas
-prop_clases <- prop.table(table(predictTest_logit$pred_pobre))
+prop_clases <- prop.table(table(predictTest_logit$pred_pobre_logit))
 print(prop_clases)
 
 # Visualizar proporción de clases en un gráfico de barras
@@ -801,61 +868,46 @@ text(x = 1:length(prop_clases),
      labels = paste0(round(prop_clases * 100, 1), "%"),
      cex = 0.8)
 
-# AHORA puedes guardar solo las columnas necesarias para la entrega
-resultados_prediccion <- predictTest_logit %>%
-  select(id, pred_pobre)
-
-# Ver las primeras filas de los resultados
-head(resultados_prediccion)
 ```
 
-##3.12 Template_Logit
+
+##3.15 Comparacion entre entrenamiento y prediccion
 
 ```{r}
-write.csv(resultados_prediccion, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
+comparacion_mod_log <- data.frame(
+  Estadística = c(
+    "Hogares clasificados como pobres",
+    "Hogares clasificados como no pobres",
+    "Porcentaje clasificado como pobre"
+  ),
+  
+  Modelo_Original = c(
+    TP_train + FP_train,
+    TN_train + FN_train,
+    sprintf("%.2f%%", (TP_train + FP_train) / (TN_train + FP_train + FN_train + TP_train) * 100)
+  ),
+  
+  Modelo_CV = c(
+    FP_train_cv + TP_train_cv,
+    TN_train_cv + FN_train_cv,
+    sprintf("%.2f%%", 100 * (FP_train_cv + TP_train_cv) / total_obs_cv)
+  ),
+  
+  Predicción_Test = c(
+           sum(resultados_prediccion_logit$pred_pobre_logit),
+           nrow(resultados_prediccion_logit) - sum(resultados_prediccion_logit$pred_pobre_logit),
+           sprintf("%.2f%%", 100 * sum(resultados_prediccion_logit$pred_pobre_logit) / nrow(resultados_prediccion_logit)))
+  )
+
+print(comparacion_mod_log)
 ```
 
-#3 Predicciones
 
-##3.1 Predicción_EN
-
+##3.16 Template_Logit
 ```{r}
-
-predictSample_EN <- test_factors   %>% 
-  mutate(pobre_lab = predict(mod_1_EN, 
-                             newdata = test_factors, 
-                             type = "raw"))%>% 
-  select(id,pobre_lab)
-
-head(predictSample_EN)
-
+write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
 ```
 
-```{r}
-predictSample_EN<- predictSample_EN %>% 
-                  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
-                  select(id,pobre)
-head(predictSample_EN) 
-```
-
-```{r}
-nrow(predictSample_EN)
-str(predictSample_EN)
-head(predictSample_EN)
-```
-
-##3.2 Template_EN
-
-```{r}
-write.csv(predictSample_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/sample_equipo4_EN.csv", row.names = FALSE)
-
-```
-
-```{r}
-str(predictSample_EN)  # Verifica estructura
-summary(predictSample_EN)  # Estadísticas básicas
-head(predictSample_EN, 10)  # Muestra las primeras 10 filas
-```
 
 # 4. Entrenamiento Ramdon Forest
 
