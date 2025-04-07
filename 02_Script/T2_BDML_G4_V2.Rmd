@@ -10,12 +10,16 @@ output: html_document
 #Cargar los paquetes de trabajo
 require("pacman")
 p_load(tidyverse, # tidy-data
+       dplyr,
        glmnet, # To implement regularization algorithms. 
        caret, # creating predictive models
        BiocManager,
        Metrics,
        readr,
-       utils)
+       utils,
+       rpart,
+       rpart.plot,
+       xgboost)
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
@@ -79,16 +83,6 @@ GET(url_excel_test2, write_disk(temp_file, overwrite = TRUE))
 
 # Leer el archivo CSV en un dataframe
 test_personas <- read_csv(temp_file)
-```
-
-#A Train
-
-```{r}
-#Asignar y cargar las bases de datos Entrenamiento
-
-train_hogares<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/train_hogares.csv")
-train_personas<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/train_personas.csv")
-
 ```
 
 ##A.1 Base Train Hogares
