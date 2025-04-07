@@ -85,52 +85,41 @@ GET(url_excel_test2, write_disk(temp_file, overwrite = TRUE))
 test_personas <- read_csv(temp_file)
 ```
 
-##A.1 Base Train Hogares
+##A.1 Inspección de Base Train Hogares
 
 ```{r}
 #Nombre de las columnas de la base train_hogares
 colnames(train_hogares)
-```
 
-```{r}
 #Seleccion de la columnas id de hogares
 train_hogares %>%
   select(id) %>%
   head()
-```
 
-```{r}
 #Cantidad de hogares probres de la base train_hogares
 table(train_hogares$Pobre)
-```
 
-```{r}
 #Incluir una columna con la asignacion de 1 si el ingreso per capita hogar es menor a la linea de probreza y 0 en caso contrario
 train_hogares <- train_hogares %>% 
   mutate(pobre_hand=ifelse(Ingpcug<Lp,1,0))
-```
 
-```{r}
 #Representación en tabla de los resultado
 table(train_hogares$Pobre,train_hogares$pobre_hand)
+
 ```
 
-##A.2 Base Train Personas
+##A.2 Inspeccionar Base Train Personas
 
 ```{r}
 #Nombre de las columnas de la base train_personas
 
 colnames(train_personas)
-```
 
-```{r}
 #Selección de la columnas id y orden de los mienbros de la base personas
 train_personas %>%
   select(id, Orden) %>%
   head()
-```
 
-```{r}
 #Agrupa las personas por hogar y calculo del indicie de personas inactivas
 train_personas_1<- train_personas %>%
   group_by(id)%>%
@@ -142,30 +131,20 @@ train_personas_1<- train_personas %>%
 
 #B Test
 
-```{r}
-#Asignar y cargar las bases de datos prueba
-
-test_hogares<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/test_hogares.csv")
-test_personas<-read.csv("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/test_personas.csv")
-
-```
-
-##B.1 Base Test Hogares
+##B.1 Inspección Base Test Hogares
 
 ```{r}
 #Nombre de las columnas de la base test_hogares
 
 colnames(test_hogares)
-```
 
-```{r}
 #Selección de la columnas id y número de personas por hogar
 test_hogares %>%
   select(id, Npersug) %>%
   head()
 ```
 
-##B.2 Base Test Personas
+##B.2 Inspección Base Test Personas
 
 ```{r}
 #Nombre de las columnas de la base test_personas
@@ -173,7 +152,7 @@ test_hogares %>%
 colnames(test_personas)
 ```
 
-#1. Pre procesamiento
+#1. Pre procesamiento de Train personas y Train hogares
 
 ```{r}
 #Pre procesamiento de la base Train_Personas
@@ -209,17 +188,13 @@ clear_test_personas <- test_personas %>%
   cotizando = ifelse(is.na(cotizando),0,cotizando),#Reemplazo de los NA
   ocupado = ifelse(is.na(Oc),0,1)) %>%
   select(id, Orden,mujer,mayor_edad,H_Head,afi_salud,EducLevel,act_semana_pasada,t_trab_semanal,cotizando,ocupado)
-```
 
-```{r}
 colnames(clear_train_personas)
-```
 
-```{r}
 colnames(clear_test_personas)
 ```
 
-##1.2 Argupar y unir Train Personas
+##1.2 Agrupar y unir Train Personas
 
 ```{r}
 #Agrupar el entrenamiento de la base personas a nivel hogar y unir las bases de datos por medio de id.
@@ -243,9 +218,7 @@ filter_train_personas_hogar<- clear_train_personas %>%
                          H_cotizando = cotizando,
                          H_Head_ocupado=ocupado) %>% 
                     left_join(summary_train_personas_nivel_hogar)
-```
 
-```{r}
 colnames(filter_train_personas_hogar)
 ```
 
@@ -274,9 +247,7 @@ filter_test_personas_hogar<- clear_test_personas %>%
                          H_cotizando = cotizando,
                          H_Head_ocupado=ocupado) %>% 
                     left_join(summary_test_personas_nivel_hogar, by = "id")
-```
 
-```{r}
 colnames(filter_test_personas_hogar)
 ```
 
@@ -308,8 +279,7 @@ clear_test_hogares<- test_hogares %>%
 
 ```{r}
 train<- clear_train_hogares %>% 
-          left_join(filter_train_personas_hogar) %>% 
-          select(-id) #no longer need id
+          left_join(filter_train_personas_hogar)
 
 test<- clear_test_hogares %>% 
           left_join(filter_test_personas_hogar)
