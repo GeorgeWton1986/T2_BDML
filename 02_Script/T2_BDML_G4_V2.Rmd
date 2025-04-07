@@ -345,7 +345,8 @@ ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.pn
 ctrl_EN<- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
-                    savePredictions = TRUE,
+                    savePredictions = TRUE, 
+                    summaryFunction = twoClassSummary
                     )
 ```
 
