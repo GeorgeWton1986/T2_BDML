@@ -332,6 +332,9 @@ text(x = 1:length(prop_clases_pobreza),
      y = prop_clases_pobreza + 0.05,
      labels = paste0(round(prop_clases_pobreza * 100, 1), "%"),
      cex = 0.8)
+
+# Guardar  
+ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
 ```
 
 #2. Entrenamiento Modelo Elastic Net
@@ -339,10 +342,10 @@ text(x = 1:length(prop_clases_pobreza),
 ```{r}
 #Configacion de la validacion Cruzada
 ctrl_EN<- trainControl(method = "cv",
-                    number = 5,
+                    number = 3,
                     classProbs = TRUE,
                     savePredictions = TRUE,
-                    summaryFunction = twoClassSummary, #Es usada para metricas como F1
+                    summaryFunction = twoClassSummary,
                     )
 ```
 
@@ -353,7 +356,7 @@ ctrl_EN<- trainControl(method = "cv",
 # El hipeparametro lambda controla la intensidad de la regularización
 
 grilla_EN <- expand.grid(
-  alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
+  alpha= c(0.1, 0.3, 0.6,0.9),
   lambda= 10^seq(-4, -1, length = 10) #Logaritmos
 )
 
@@ -372,8 +375,9 @@ mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
     method = "glmnet", #Metodo de cálculo Elastic Net
     trControl = ctrl_EN, #Validacion Cruzada
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
-    metric = "ROC", # Metrica F1 es usada para conjunto de datos que estan desbalanceados
-    preProcess = c("center","scale","zv") #Preprocesamiento
+    metric = "ROC",
+    preProcess = c("center","scale"), #Preprocesamiento
+    allowParallel = FALSE  # Desactivar paralelización
     )
 ```
 
@@ -1179,7 +1183,7 @@ setwd("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestr
 write.csv(predicciones_kaggle_gbm, "kaggle_submission_gbm.csv", row.names = FALSE)
 ```
 
-# 6. Entrenamiento algoritmo Caret
+# 6. Entrenamiento algoritmo CART
 
 ## 6.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
 
