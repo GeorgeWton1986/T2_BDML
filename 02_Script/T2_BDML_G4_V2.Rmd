@@ -1203,7 +1203,7 @@ table(predicciones_kaggle_nb$Pobre)
 ##7.5.Template Naive Bayes
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_naivebayes, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/05_Predictions/sample_equipo4_naivebayes.csv", row.names = FALSE)
+write.csv(predicciones_kaggle_nb, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/05_Predictions/sample_equipo4_naivebayes.csv", row.names = FALSE)
 ```
 
 
