@@ -357,8 +357,8 @@ ctrl_EN<- trainControl(method = "cv",
 # El hipeparametro lambda controla la intensidad de la regularización
 
 grilla_EN <- expand.grid(
-  alpha= c(0.1, 0.5, 0.9),
-  lambda= 10^seq(-3, -1, length = 5) #Logaritmos
+  alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
+  lambda= 10^seq(-4, -1, length = 10) #Logaritmos
 )
 
 ```
@@ -371,13 +371,13 @@ grilla_EN <- expand.grid(
 #Entrenamiento del modelo
 set.seed(123)
 
-mod_1_EN <- train(Pobre ~ ., #Modelo 1 Elastic Net
+mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
     data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
     trControl = ctrl_EN, #Validacion Cruzada
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
     metric = "ROC",
-    preProcess = c("center","scale"), #Preprocesamiento
+    preProcess = c("center","scale","zv") #Preprocesamiento
     )
 ```
 
@@ -844,7 +844,7 @@ print(prediccion_test_logit)
 ##3.14 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
-hist(predictTest_logit$prob_pobre, 
+hist(predictTest_logit$prob_pobre_logit, 
      main = "Distribución de probabilidades", 
      xlab = "Probabilidad de ser clasificado como pobre",
      col = "lightblue",
