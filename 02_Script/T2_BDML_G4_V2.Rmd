@@ -1122,7 +1122,90 @@ print(paste("AUC Ranger (CV): ", round(aucval_rf_cv, 4)))
 
 ```
 
-##7. 
+##7. Naive Bayes
+
+##7.1. Detección variables varianza cero
+
+```{r}
+p_load(caret)
+
+# Detectar variables con varianza cercana a cero
+casi_cero <- nearZeroVar(train_factors, saveMetrics = TRUE)
+
+# Ver variables con varianza casi cero
+casi_cero[casi_cero$nzv == TRUE, ]
+
+# Crear versión filtrada solo para Naive Bayes
+vars_quitar <- c("hipoteca", "sin_titulo", "H_afi_salud")
+train_nb <- train_factors[, !(names(train_factors) %in% vars_quitar)]
+test_nb <- test_factors[, !(names(test_factors) %in% vars_quitar)]
+
+```
+
+##7.2. Grilla Naive Bayes
+
+```{r}
+p_load(naivebayes, caret)
+
+# Definir grilla de hiperparámetros para Naive Bayes
+grid_nb <- expand.grid(
+  usekernel = c(TRUE, FALSE),
+  adjust = c(0.5, 1, 2),
+  laplace = c(0, 1)
+)
+
+```
+
+##7.3. Entrenamiento CV
+```{r}
+# Control de entrenamiento con validación cruzada
+ctrl_nb <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  sampling = "up",
+  verboseIter = FALSE
+)
+
+# Entrenar modelo Naive Bayes
+set.seed(123)
+nb_model <- train(
+  Pobre ~ ., 
+  data = train_nb,
+  method = "naive_bayes",
+  trControl = ctrl_nb,
+  tuneGrid = grid_nb,
+  metric = "ROC",
+  preProcess = c("center", "scale")
+)
+
+# Ver resultados del modelo
+nb_model
+
+```
+
+##7.4. 
+```{r}
+# Obtener probabilidades sobre el test set
+pred_prob_nb <- predict(nb_model, newdata = test_nb, type = "prob")
+
+#Umbral de 0.3
+pred_clase_nb <- ifelse(pred_prob_nb[, "Yes"] >= 0.3, 1, 0)
+
+# Crear dataframe final para enviar
+predicciones_kaggle_nb <- data.frame(id = test$id, Pobre = pred_clase_nb)
+
+# Ver tabla resumen
+table(predicciones_kaggle_nb$Pobre)
+```
+
+##7.5.Template Naive Bayes
+```{r}
+## Template_RF
+write.csv(resultados_prediccion_naivebayes, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/05_Predictions/sample_equipo4_naivebayes.csv", row.names = FALSE)
+```
+
 
 ##5. Entrenamiento Boosting
 
