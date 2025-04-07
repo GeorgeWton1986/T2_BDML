@@ -279,7 +279,8 @@ clear_test_hogares<- test_hogares %>%
 
 ```{r}
 train<- clear_train_hogares %>% 
-          left_join(filter_train_personas_hogar)
+          left_join(filter_train_personas_hogar)%>% 
+          select(-id) #no longer need id
 
 test<- clear_test_hogares %>% 
           left_join(filter_test_personas_hogar)
@@ -361,7 +362,7 @@ grilla_EN <- expand.grid(
 
 ```
 
-##2.3 Entrenar el modelo Elastic Net
+##2.3 Entrenar el modelo Elastic Net con Caret
 ```{r}
 #Modelo Elastic Net
 #Tiempo para ejecucion 6 min
@@ -369,8 +370,8 @@ grilla_EN <- expand.grid(
 #Entrenamiento del modelo
 set.seed(123)
 
-mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
-    data=train_factors, #Datos de entrenamiento en factores
+mod_1_EN <- train(Pobre ~ ., #Modelo 1 Elastic Net
+    data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
     trControl = ctrl_EN, #Validacion Cruzada
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
