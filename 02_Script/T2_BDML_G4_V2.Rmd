@@ -295,7 +295,7 @@ train_factors<- train %>%
          hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
          arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
          usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
-         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
+         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")), #No se tiene documento de propiedad
          Pobre=factor(Pobre,levels = c(0,1),labels = c("No", "Yes")),
          H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
@@ -306,83 +306,216 @@ test_factors<- test %>%
          hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
          arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
          usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
-         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
+         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")), #No se tiene documento de propiedad
          H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
 
 ```
+##1.8 Revision del Balance de Clases Train
+
+```{r}
+# Calcular proporción de clases (No pobre vs Pobre)
+tabla_pobreza <- table(train_factors$Pobre)
+prop_clases_pobreza <- prop.table(tabla_pobreza)
+
+# Visualizar proporción de clases en un gráfico de barras
+barplot(prop_clases_pobreza,
+        main = "Proporción de clases de pobreza en datos de entrenamiento",
+        xlab = "Condición de pobreza",
+        ylab = "Proporción",
+        col = c("lightgreen", "coral"),
+        names.arg = c("No pobre", "Pobre"),
+        ylim = c(0, 1))
+
+# Agregar etiquetas de porcentaje
+text(x = 1:length(prop_clases_pobreza), 
+     y = prop_clases_pobreza + 0.05,
+     labels = paste0(round(prop_clases_pobreza * 100, 1), "%"),
+     cex = 0.8)
+```
 
 #2. Entrenamiento Modelo Elastic Net
-
-##2.1 Modelo Elastic Net
-
+##2.1 Modelo Elastic Net con Caret
 ```{r}
-
-ctrl<- trainControl(method = "cv",
+#Configacion de la validacion Cruzada
+ctrl_EN<- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
-                    savePredictions = T)
+                    savePredictions = TRUE,
+                    summaryFunction = twoClassSummary, #Es usada para metricas como F1
+                    )
 ```
 
+##2.2 Definir la cuadricula de hiperparametros
+```{r}
+#Definir la grilla de los hiperparametros alfa y lambda
+# El hipeparametro alfa controla Ridge (0) y Lasso (1)
+# El hipeparametro lambda controla la intensidad de la regularización
+
+grilla_EN <- expand.grid(
+  alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
+  lambda= 10^seq(-4, -1, length = 10) #Logaritmos
+)
+
+```
+
+##2.3 Entrenar el modelo Elastic Net
 ```{r}
 #Modelo Elastic Net
+#Tiempo para ejecucion 6 min
 
+#Entrenamiento del modelo
 set.seed(123)
 
-mod_1_EN <- train(Pobre~.,#Modelo 1 Elastic Net
-    data=train_factors,
-    metric = "Accuracy",
-    method = "glmnet",
-    trControl = ctrl,
-    tuneGrid=expand.grid(
-              alpha = seq(0,1,by=.2),
-              lambda =10^seq(10, -2, length = 10)
+mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
+    data=train_factors, #Datos de entrenamiento en factores
+    method = "glmnet", #Metodo de cálculo Elastic Net
+    trControl = ctrl_EN, #Validacion Cruzada
+    tuneGrid = grilla_EN, #Grilla de Hiperparametros
+    metric = "ROC", # Metrica F1 es usada para conjunto de datos que estan desbalanceados
+    preProcess = c("center","scale","zv") #Preprocesamiento
     )
-               
+```
+
+##2.4 Resultado modelo Elastic Net
+```{r}
+# Resumen del modelo entrenado  Elastic Net
+print(mod_1_EN)
+
+# Resumen hiperparámetros 
+print(mod_1_EN$bestTune)
+
+# Resultados de validación cruzada
+plot(mod_1_EN)
+
+
+```
+
+##2.5 Matriz de confusion Elatic Net
+```{r}
+#Umbral de decision de Probreza
+umbral <- 0.3
+
+#obtener la probabilidad de los datos de entrenamiento
+prob_train <- predict(mod_1_EN, newdata = train_factors, type = "prob")[,"Yes"]
+
+# Obtener predicciones en los datos de entrenamiento
+predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
+predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
+
+# Matriz de confusión del modelo Elastic Net
+B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
+B_EN <- B_EN$table
+
+# Explicación de valores matriz de confusión
+TN_train_EN <- B_EN[1,1]  # Verdaderos Negativos
+FP_train_EN <- B_EN[1,2]  # Falsos Positivos
+FN_train_EN <- B_EN[2,1]  # Falsos Negativos
+TP_train_EN <- B_EN[2,2]  # Verdaderos Positivos
+
+# Crear tabla de conteos
+counts_table_EN <- data.frame(
+  categoría = c("Verdaderos Negativos (TN)", "Falsos Positivos (FP)", 
+                "Falsos Negativos (FN)", "Verdaderos Positivos (TP)"),
+  conteo = c(TN_train_EN, FP_train_EN, FN_train_EN, TP_train_EN)
 )
+
+print(counts_table_EN)
+
 ```
 
-##2.2 Resultado_EN
-
+##2.6 Metricas Modelo Elastic Net
 ```{r}
-mod_1_EN
+# Calcular métricas
+accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
+precision_train_EN <- TP_train_EN / (TP_train_EN + FP_train_EN)
+recall_train_EN <- TP_train_EN / (TP_train_EN + FN_train_EN)
+specificity_train_EN <- TN_train_EN / (TN_train_EN + FP_train_EN)
+f1_score_train_EN <- 2 * (precision_train_EN * recall_train_EN) / (precision_train_EN + recall_train_EN)
+error_rate_train_EN <- 1 - accuracy_train_EN
+
+# Crear un data frame con los resultados
+metrics_table_mod_1_EN <- data.frame(
+  metrica_train_cv = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+              "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
+  Valor = c(accuracy_train_EN, precision_train_EN, recall_train_EN, specificity_train_EN, f1_score_train_EN, error_rate_train_EN),
+    Descripción = c(
+    "Proporción total de predicciones correctas",
+    "De los predichos como pobres, cuántos realmente lo son",
+    "De los realmente pobres, cuántos fueron identificados correctamente",
+    "De los realmente no pobres, cuántos fueron identificados correctamente",
+    "Media armónica entre precisión y recall",
+    "Proporción de predicciones incorrectas"
+))
+
+# Imprimir tabla de métricas
+print(metrics_table_mod_1_EN)
 ```
 
-##2.2 Modelo F1
-
+##2.6 Explorar la importancia de las variables
 ```{r}
-p_load(Metrics)
-fiveStats <- function(...)  c(prSummary(...))  
+# Ver la importancia de las variables
+importancia <- varImp(mod_1_EN)
+plot(importancia, top = 10)  # Mostrar las 20 variables más importantes
+```
+##2.6 Prediccion con el Test Set Elastic Net
+```{r}
+#Prediccion el Test Set
+predictTest_EN <- test_factors %>%
+  mutate(prob_probre_EN = predict(mod_1_EN,
+         newdata = test_factors,
+         type = "prob")[,"Yes"],
+         pred_probre_cat_EN = ifelse(prob_probre_EN > umbral, "Yes", "No"), #Cambio del umbral de referencia
+         pred_probre_EN = ifelse(pred_probre_cat_EN == "Yes", 1, 0)# Predicción numérica (1/0)
+         )
+
+# Resumen verificación
+summary(predictTest_EN$prob_probre_EN)
+table(predictTest_EN$pred_probre_cat_EN)
+table(predictTest_EN$pred_probre_EN)
+
+# Guardar los resultados
+resultados_prediccion_EN<- predictTest_EN %>%
+  select(id, pred_probre_EN)
+
+# Ver las primeras filas de los resultados
+head(resultados_prediccion_EN)
+```
+##2.7 Gráficos de la predicción
+```{r}
+# Distribucion de probabilidades predichas
+hist(predictTest_EN$prob_probre_EN, 
+     main = "Distribución de probabilidades", 
+     xlab = "Probabilidad de ser clasificado como pobre",
+     col = "lightblue",
+     border = "white",
+     breaks = 20)  # Puedes ajustar el número de rangos
+
+# Proporción de clases predichas
+prop_clases_EN <- prop.table(table(predictTest_EN$pred_probre_EN))
+print(prop_clases_EN)
+
+# Visualizar proporción de clases en un gráfico de barras
+barplot(prop_clases_EN,
+        main = "Proporción de clases predichas",
+        xlab = "Clase (0 = No pobre, 1 = Pobre)",
+        ylab = "Proporción",
+        col = c("lightgreen", "coral"),
+        names.arg = c("No pobre", "Pobre"),
+        ylim = c(0, 1))
+
+# Agregar etiquetas de porcentaje
+text(x = 1:length(prop_clases_EN), 
+     y = prop_clases_EN + 0.05,
+     labels = paste0(round(prop_clases_EN * 100, 1), "%"),
+     cex = 0.8)
 
 
-ctrl<- trainControl(method = "cv",
-                    number = 5,
-                    classProbs = TRUE,
-                    summaryFunction = fiveStats,
-                    savePredictions = TRUE)
 ```
 
+##2.8 Template Elastic Net
 ```{r}
-
-set.seed(123)
-mod_1_F <- train(Pobre~.,
-    data=train_factors,
-    metric = "F",
-    method = "glmnet",
-    trControl = ctrl,
-    family="binomial",
-    tuneGrid=expand.grid(
-              alpha = seq(0,1,by=.5),
-              lambda =10^seq(-1, -3, length = 10)
-    )
-
-)
-```
-
-##2.4 Resultado_F1
-
-```{r}
-mod_1_F
+write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
 
 #3. Entrenamiento Modelo Logit
