@@ -1225,26 +1225,7 @@ write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage
 
 # 4. Entrenamiento Ramdon Forest
 
-## 4.1 Entrenamiento modelo con randomForest (sin crossvalidation)
-
-```{r}
-randomforest <- randomForest::randomForest(Pobre ~ . ,
-               data = train_factors, 
-               mtry = 4,  # Valor óptimo encontrado en CV
-               ntree = 500,  # Número de árboles
-               importance = TRUE)  # Para ver la importancia de variables
-          
-# Ver resultados
-print(randomforest)
-
-```
-
-```{r}
-# Ver importancia de variables
-randomForest::varImpPlot(randomforest)
-```
-
-## 4.2 Ajustar la base test_factors
+## 4.1 Ajustar la base test_factors con la misma estructura que train factors
 
 ```{r}
 # Verificar si 'Pobre' falta en test_factors y agregarlo correctamente
@@ -1253,13 +1234,13 @@ if (!("Pobre" %in% names(test_factors))) {
 }
 
 # Asegurar que test_factors tenga todas las variables de train_factors
-missing_vars <- setdiff(names(train_factors), names(test_factors))
-for (var in missing_vars) {
-  test_factors[[var]] <- NA  
-}
+#issing_vars <- setdiff(names(train_factors), names(test_factors))
+#for (var in missing_vars) {
+#  test_factors[[var]] <- NA  
+#}
 
 # Reordenar columnas para que coincidan
-test_factors <- test_factors[, names(train_factors), drop = FALSE]
+#test_factors <- test_factors[, names(train_factors), drop = FALSE]
 
 # Ajustar niveles de factores
 for (col in names(test_factors)) {
@@ -1273,51 +1254,65 @@ table(test_factors$Pobre, useNA = "always")
 
 ```
 
+## 4.2 Entrenamiento modelo con randomForest (sin crossvalidation)
+
+```{r}
+set.seed(123)
+
+randomforest <- randomForest::randomForest(Pobre ~ . ,
+               data = train_factors, 
+               mtry = 4,  # Valor óptimo encontrado en CV
+               ntree = 500,  # Número de árboles
+               importance = TRUE)  # Para ver la importancia de variables
+          
+# Ver resultados
+print(randomforest)
+```
+
 ## 4.3 Predicción con el modelo Random Forest
 
 ```{r}
-
-# Predicciones con randomForest
-rf_pred_probs <- predict(randomforest, newdata = test_factors, type = "prob")
-rf_pred_probs
-rf_pred_classes <- predict(randomforest, newdata = test_factors)
-table(rf_pred_classes)
-
-```
-
-## 4.4 Predición Random Forest con el Test Set/Clasificacion
-
-```{r}
-#Prediccion el Test Set
+# Predicción en test_factors excluyendo 'id'
 predictTest_rf <- test_factors %>% 
   mutate(
-    prob_pobre_rf= predict(randomforest, 
-                         newdata = test_factors, 
-                         type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
-    pred_pobre_cat_rf = ifelse(prob_pobre_rf > 0.5, "Yes", "No"), #Cambio del umbral de referencia
-    pred_pobre_rf = ifelse(pred_pobre_cat_rf == "Yes", 1, 0)# Predicción numérica (1/0)
+    prob_pobre_rf = predict(
+      randomforest, 
+      newdata = test_factors[, setdiff(names(test_factors), "id")], 
+      type = "prob"
+    )[,"Yes"],
+
+    pred_pobre_cat_rf = ifelse(prob_pobre_rf > 0.5, "Yes", "No"),
+    pobre = ifelse(pred_pobre_cat_rf == "Yes", 1, 0)
   )
 
-# Resumen
-summary(predictTest_rf$prob_pobre_rf)
-table(predictTest_rf$pred_pobre_cat_rf)
-table(predictTest_rf$pred_pobre_rf)
+# Guardar resultados para Kaggle con el nombre Pobre
+resultados_prediccion_rf <- predictTest_rf %>%
+  select(id, pobre)
 
-# Guardar los resultados
-resultados_prediccion_rf<- predictTest_rf %>%
-  select(id, pred_pobre_rf)
-
-# Ver las primeras filas de los resultados
-head(resultados_prediccion_rf)
 ```
-
-## 4.5 Template_RF
+## 4.4 Template_RF
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/040425sample_equipo4_rf.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf.csv", row.names = FALSE)
 ```
 
+## 4.5 Ver importancia de variables RF
+
+```{r}
+
+# Ver importancia de variables
+randomForest::varImpPlot(randomforest, main = "Importancia de Variables (Random Forest)")
+
+png("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/04_Views/GRAFICO_IMPOVARI_RF.png",
+    width = 900, height = 600)
+
+par(mfrow = c(1, 2), mar = c(5, 8, 4, 2))  
+randomForest::varImpPlot(randomforest, main = "Importancia de Variables (Random Forest)")
+
+dev.off()
+
+```
 ## 4.6 Entrenamiento fuera de muestra cross validation con ranger
 
 ```{r}
@@ -1349,90 +1344,93 @@ mtry_grid <- expand.grid(
 
 ```
 
+
 ## 4.7 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
 
 ```{r}
-# Eliminar municipio 
-train_factors <- train_factors %>% 
-  select(-Dominio, -id)
+# Crear versión temporal sin Dominio ni id
+train_rf <- train_factors %>% 
+  select(-Dominio)
 
-
+# Entrenamiento
 cv_rf <- train(
   Pobre ~ .,
-  data = train_factors,
+  data = train_rf,
   method = "ranger",
   metric = "ROC",
   tuneGrid = mtry_grid,
   trControl = ctrl_rf_cv,
   num.trees = 500,
-  importance = "impurity"  # Para calcular importancia de variables
+  importance = "impurity"
 )
 
-print(cv_rf)
 
 ```
-
-## 4.8 Predicciones con ranger y randomForest
+## 4.8 Predicciones RF con libreria ranger + cv
 
 ```{r}
-#Prediccion el Test Set
+# Predicción en test_factors excluyendo 'id'
 predictTest_rf_cv <- test_factors %>% 
   mutate(
-    prob_pobre_rf_cv = predict(cv_rf, 
-                         newdata = test_factors, 
-                         type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
-    
-    pred_pobre_cat_rf_cv = ifelse(prob_pobre_rf_cv > 0.5, "Yes", "No"), #Cambio del umbral de referencia
-    pred_pobre_rf_cv = ifelse(pred_pobre_cat_rf_cv == "Yes", 1, 0)# Predicción numérica (1/0)
+    prob_pobre_rf_cv = predict(
+      cv_rf, 
+      newdata = test_factors[, setdiff(names(test_factors), "id")], 
+      type = "prob"
+    )[,"Yes"],
+
+    pred_pobre_cat_rf_cv = ifelse(prob_pobre_rf_cv > 0.5, "Yes", "No"),
+    pobre = ifelse(pred_pobre_cat_rf_cv == "Yes", 1, 0)
   )
 
-# Resumen
-summary(predictTest_rf_cv$prob_pobre_rf_cv)
-table(predictTest_rf_cv$pred_pobre_cat_rf_cv)
-table(predictTest_rf_cv$pred_pobre_rf_cv)
-
-# Guardar los resultados
+# Guardar resultados para Kaggle con el nombre solicitado
 resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
-   select(id, pred_pobre_rf_cv)
-
-# Ver las primeras filas de los resultados
-head(resultados_prediccion_rf_cv)
+  select(id, pobre)
 
 ```
 
-```{r}
-# Ver importancia de variables en ranger
-plot(varImp(cv_rf), top = 10)
-
-```
-
-## 4.5 Template_RF_CV
+## 4.9 Template_RF_CV
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/050425sample_equipo4_rf_cv.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf_cv.csv", row.names = FALSE)
 ```
 
+## 4.10 Ver importancia de variables
 ```{r}
-# Comparar AUC de ambos modelos
+# Crear gráfico de importancia de variables
+varimp_plot <- plot(varImp(cv_rf), top = 10)
 
-# Modelo RandomForest (sin CV)
+# Guardar el gráfico
+png("C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/04_Views/GRÁFICO-VARIABLE IMPORTANTE_rf_cv.png", width = 800, height = 600)
+plot(varImp(cv_rf), top = 10)
+dev.off()
+
+# Mostrar gráfico
+plot(varImp(cv_rf), top = 10)
+
+```
+## 4.11 Comparar AUC de ambos modelos
+```{r}
+# AUC para modelo RandomForest sin CV
 aucval_rf <- Metrics::auc(
-  actual = predictTest_rf$pred_pobre_rf,          
-  predicted = predictTest_rf$prob_pobre_rf        
+  actual = predictTest_rf$pobre,
+  predicted = predictTest_rf$prob_pobre_rf
 )
 
-# Modelo RandomForest (con CV - ranger)
+# AUC para modelo RandomForest con CV (ranger)
 aucval_rf_cv <- Metrics::auc(
-  actual = predictTest_rf_cv$pred_pobre_rf_cv,         
-  predicted = predictTest_rf_cv$prob_pobre_rf_cv    
+  actual = predictTest_rf_cv$pobre,
+  predicted = predictTest_rf_cv$prob_pobre_rf_cv
 )
 
 # Mostrar resultados
 print(paste("AUC RandomForest: ", round(aucval_rf, 4)))
-print(paste("AUC Ranger (CV): ", round(aucval_rf_cv, 4)))
+print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
+
+
 
 ```
+
 
 ##7. Naive Bayes
 
