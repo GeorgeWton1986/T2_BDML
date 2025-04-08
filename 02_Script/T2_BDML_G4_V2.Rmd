@@ -395,7 +395,7 @@ plot(mod_1_EN)
 
 ```
 
-##2.5 Matriz de confusion Elatic Net
+##2.5 Predicción modelo Elastic Net
 ```{r}
 #Umbral de decision de Probreza
 umbral <- 0.3
@@ -407,6 +407,11 @@ prob_train <- predict(mod_1_EN, newdata = train_factors, type = "prob")[,"Yes"]
 predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
 predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
 
+
+
+```
+##2.6 Matriz de confusion
+```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
 B_EN <- B_EN$table
@@ -425,7 +430,6 @@ counts_table_EN <- data.frame(
 )
 
 print(counts_table_EN)
-
 ```
 
 ##2.6 Metricas Modelo Elastic Net
