@@ -339,6 +339,7 @@ text(x = 1:length(prop_clases_pobreza),
 ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
 ```
 
+
 ##1.9 Rebalanceo de la muestra train
 ```{r}
 # Calcular ponderadores
@@ -447,7 +448,7 @@ importancia <- varImp(mod_1_EN)
 
 # Convertir a dataframe y ordenar
 imp_df <- data.frame(
-  Variable = rownames(importancia_vars$importance),
+  Variable = rownames(importancia$importance),
   Importancia = importancia$importance[,1]
 )
 imp_df <- imp_df[order(imp_df$Importancia, decreasing = TRUE),]
@@ -1608,7 +1609,7 @@ submission <- data.frame(id = ids, Pobre = pred_clase)
 str(submission)
 ```
 
-##3.2 Template_CART
+##6.3 Template_CART
 
 ```{r}
 write.csv
