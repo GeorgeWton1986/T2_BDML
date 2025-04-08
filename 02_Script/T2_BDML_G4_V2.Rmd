@@ -532,7 +532,7 @@ ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
 ```
 
 
-##2.7 Entrenar el modelo Elastic Net con Caret variables importantes
+##2.8 Entrenar el modelo Elastic Net con Caret variables importantes
 ```{r}
 # Entrenar un nuevo modelo con el dataset reducido
 set.seed(123)
@@ -548,7 +548,7 @@ mod_1_EN<- train(
 ```
 
 
-##2.8 Predicción modelo Elastic Net
+##2.9 Predicción modelo Elastic Net
 ```{r}
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
@@ -557,7 +557,7 @@ prob_train <- predict(mod_1_EN,
 ```
 
 
-##2.9 Optimización de umbral para maximizar F1 Score
+##2.10 Optimización de umbral para maximizar F1 Score
 ```{r}
 # Calculamos la curva PR para 100 valores de umbral
 prec_recall <- data.frame(coords(roc(response = train_importantes$Pobre, predictor = prob_train), 
@@ -596,7 +596,7 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.10 Crear la curva ROC para prediccion train set Elastic Net
+##2.11 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
@@ -647,7 +647,7 @@ ggplot() +
 
 ```
 
-##2.11 Matriz de confusion
+##2.12 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_importantes$Pobre)
@@ -669,7 +669,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.12 Metricas Modelo Elastic Net
+##2.13 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -697,7 +697,7 @@ metrics_table_mod_1_EN <- data.frame(
 print(metrics_table_mod_1_EN)
 ```
 
-##2.13 Prediccion con el Test Set Elastic Net
+##2.14 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -734,7 +734,7 @@ prediccion_test_EN <- data.frame(
 print(prediccion_test_EN)
 ```
 
-##2.14 Gráficos de la predicción
+##2.15 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -766,7 +766,7 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.15 Template Elastic Net
+##2.16 Template Elastic Net
 ```{r}
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
