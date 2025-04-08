@@ -418,7 +418,7 @@ set.seed(123)
 mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
     data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
-    weights = wts,  # Inclusion de penderacion
+    weights = wts,  # Inclusion de penderacion de clases
     trControl = ctrl_EN, #Validacion Cruzada
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
     metric = "ROC",
@@ -633,7 +633,8 @@ write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/On
 #Calculo de los estimadores Logit
 mod_1_logit<- glm(Pobre~., 
                  data = train_factors, 
-                 family = "binomial")
+                 family = "binomial",
+                 weights = wts) # Inclusion de penderacion de clases
 
 ```
 
@@ -662,7 +663,7 @@ head(prob_logit %>%
 ## 3.5 Clasificador Logit
 ```{r}
 
-rule <- 0.4 # Bayes Rule
+rule <- 0.3 # Bayes Rule
 
 prob_logit<- prob_logit %>% 
   mutate(pred_pobre=ifelse(prob_hat>rule,1,0))    ## prediccion de pobre (0) No pobre y (1) Pobre
@@ -778,7 +779,8 @@ mod_2_logit <- train(Pobre~. ,
                      method = "glm",
                      family = "binomial",
                      trControl = ctrl_logit,
-                     metric = "Accuracy"
+                     metric = "Accuracy",
+                     weights = wts # Inclusion de penderacion de clases
                      )
 
 # Ver resultados
@@ -793,7 +795,8 @@ head(mod_2_logit$pred)
 ##3.9 Matriz de confusion modelo 2
 ```{r}
 # Obtener predicciones en los datos de entrenamiento
-predicciones_train_cv <- predict(mod_2_logit, newdata = train_factors)
+predicciones_train_cv <- predict(mod_2_logit, 
+                                 newdata = train_factors)
 
 # Matriz de confusión del modelo con validación cruzada
 B_cv <- confusionMatrix(predicciones_train_cv, train_factors$Pobre)
