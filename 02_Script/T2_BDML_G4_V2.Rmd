@@ -467,11 +467,6 @@ plot(importancia, top = 15)
 prob_train <- predict(mod_1_EN, 
                       newdata = train_factors, 
                       type = "prob")[,"Yes"]
-
-# Obtener predicciones en los datos de entrenamiento de acuerdo con el umbral
-predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
-predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
-
 ```
 
 ##2.7 Optimización de umbral para maximizar F1 Score
