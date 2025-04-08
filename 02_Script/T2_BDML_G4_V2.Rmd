@@ -314,8 +314,7 @@ test_factors<- test %>%
          maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
 
 ```
-##1.8 Revision del Balance de Clases Train
-
+##1.8 Grafica Revision del Balance de Clases Train
 ```{r}
 # Calcular proporción de clases (No pobre vs Pobre)
 tabla_pobreza <- table(train_factors$Pobre)
@@ -338,6 +337,49 @@ text(x = 1:length(prop_clases_pobreza),
 
 # Guardar  
 ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
+```
+
+##1.9 Rebalanceo de la muestra train
+```{r}
+# Calcular ponderadores
+n_no_pobre <- sum(train_factors$Pobre == "No")
+n_pobre <- sum(train_factors$Pobre == "Yes")
+pos_weight <- n_no_pobre / n_pobre  # Peso para la clase minoritaria (Pobre)
+
+# Crear vector de pesos
+wts <- ifelse(train_factors$Pobre == "Yes", pos_weight, 1)
+
+
+```
+
+##1.10 Grafica Revision del rebalance de Clases Train
+```{r}
+# Calcular distribución ponderada
+tabla_ponderada <- c(
+  sum(wts[train_factors$Pobre == "No"]),  # Suma de pesos para "No pobre"
+  sum(wts[train_factors$Pobre == "Yes"])  # Suma de pesos para "Pobre"
+)
+prop_ponderada <- prop.table(tabla_ponderada)
+
+# Crear dataframe
+datos_plot <- data.frame(
+  Clase = rep(c("No pobre", "Pobre"), 2),
+  Proporcion = c(prop_clases_pobreza, prop_ponderada),
+  Tipo = rep(c("Original", "Ponderada"), each = 2)
+)
+
+# Crear gráfico de barras agrupadas
+ggplot(datos_plot, aes(x = Clase, y = Proporcion, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
+  geom_text(aes(label = paste0(round(Proporcion * 100, 1), "%")), 
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 3.5) +
+  labs(title = "Proporción de clases: Original vs. Ponderada",
+       x = "Condición de pobreza",
+       y = "Proporción") +
+  scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
+  theme_minimal() +
+  ylim(0, 1)
 ```
 
 #2. Entrenamiento Modelo Elastic Net
@@ -376,6 +418,7 @@ set.seed(123)
 mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
     data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
+    weights = wts,  # Inclusion de penderacion
     trControl = ctrl_EN, #Validacion Cruzada
     tuneGrid = grilla_EN, #Grilla de Hiperparametros
     metric = "ROC",
@@ -400,7 +443,7 @@ plot(mod_1_EN)
 ##2.5 Predicción modelo Elastic Net
 ```{r}
 #Umbral de decision de Probreza
-umbral <- 0.3
+umbral <- 0.5
 
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
