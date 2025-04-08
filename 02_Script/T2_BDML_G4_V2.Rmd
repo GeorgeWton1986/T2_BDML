@@ -443,7 +443,7 @@ plot(mod_1_EN)
 ##2.5 Predicción modelo Elastic Net
 ```{r}
 #Umbral de decision de Probreza
-umbral <- 0.5
+umbral <- 0.5 #Define la regla de los modelos Elastic Net y Logit 
 
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
@@ -456,7 +456,7 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.6 Crear la curva ROC para prediccion train set
+##2.6 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
@@ -663,10 +663,10 @@ head(prob_logit %>%
 ## 3.5 Clasificador Logit
 ```{r}
 
-rule <- 0.3 # Bayes Rule
+umbral # Bayes Rule #Ver variable Umbral
 
 prob_logit<- prob_logit %>% 
-  mutate(pred_pobre=ifelse(prob_hat>rule,1,0))    ## prediccion de pobre (0) No pobre y (1) Pobre
+  mutate(pred_pobre=ifelse(prob_hat>umbral,1,0))    ## prediccion de pobre (0) No pobre y (1) Pobre
 
 head(prob_logit %>%
        select(Pobre,prob_hat,pred_pobre))
@@ -796,10 +796,70 @@ head(mod_2_logit$pred)
 ```{r}
 # Obtener predicciones en los datos de entrenamiento
 predicciones_train_cv <- predict(mod_2_logit, 
-                                 newdata = train_factors)
+                                 newdata = train_factors,
+                                 type = "prob")
 
+umbral # Bayes Rule #Ver variable Umbral
+
+predicciones_umbral <- factor(ifelse(predicciones_train_cv[,"Yes"] > umbral, 
+                                    "Yes", "No"), 
+                             levels = levels(train_factors$Pobre))
+
+```
+##3.10 Crear la curva ROC para prediccion train set Logit
+```{r}
+# Crear objeto ROC
+roc_obj_logit <- roc(response = train_factors$Pobre, 
+               predictor = prob_train)
+
+# Calcular AUC
+auc_value_logit <- auc(roc_obj)
+
+# Calcular punto específico en la curva ROC para el umbral elegido
+conf_matrix_logit <- confusionMatrix(predicciones_train, train_factors$Pobre)
+sensibilidad_umbral_logit <- conf_matrix$byClass["Sensitivity"]
+especificidad_umbral_logit <- conf_matrix$byClass["Specificity"]
+
+# Extraer datos para ggplot
+roc_data_logit <- data.frame(
+  Especificidad = 1 - roc_obj_logit$specificities,
+  Sensibilidad = roc_obj_logit$sensitivities
+)
+
+# Punto para el umbral elegido
+punto_umbral_logit <- data.frame(
+  Especificidad = 1 - especificidad_umbral,
+  Sensibilidad = sensibilidad_umbral
+)
+
+# Crear gráfico con ggplot2
+ggplot() +
+  geom_line(data = roc_data_logit, aes(x = Especificidad, y = Sensibilidad), 
+            color = "blue", size = 1) +
+  geom_point(data = punto_umbral_logit, aes(x = Especificidad, y = Sensibilidad), 
+             color = "red", size = 3) +
+  geom_text(data = punto_umbral_logit, 
+            aes(x = Especificidad, y = Sensibilidad, 
+                label = paste("Umbral =", umbral)),
+            hjust = -0.2, vjust = -0.5, color = "red") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Curva ROC - Modelo Logístico con Validación Cruzada",
+    subtitle = paste("AUC =", round(auc_value, 4)),
+    x = "1 - Especificidad (Tasa de Falsos Positivos)",
+    y = "Sensibilidad (Tasa de Verdaderos Positivos)"
+  ) +
+  theme_minimal() +
+  coord_equal() +
+  annotate("text", x = 0.75, y = 0.25, 
+           label = paste("AUC =", round(auc_value, 4)), 
+           color = "blue", size = 5)
+```
+
+##3.11 Matriz de Confusion Logit
+```{r}
 # Matriz de confusión del modelo con validación cruzada
-B_cv <- confusionMatrix(predicciones_train_cv, train_factors$Pobre)
+B_cv <- confusionMatrix(predicciones_umbral, train_factors$Pobre)
 B_cv <- B_cv$table
 
 
@@ -825,7 +885,9 @@ counts_table_cv$porcentaje <- sprintf("%.2f%%", 100 * counts_table_cv$conteo / t
 print(counts_table_cv)
 
 ```
-##3.10 Metricas Modelo de Entrenamieno Logit 
+
+
+##3.12 Metricas Modelo de Entrenamieno Logit 
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -872,7 +934,7 @@ metrics_table_mod_2_log <- data.frame(
 print(metrics_table_mod_2_log)
 ```
 
-##3.11 Explorar la importancia de las variables
+##3.13 Explorar la importancia de las variables
 ```{r}
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
@@ -880,7 +942,7 @@ print(importancia)
 plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
-##3.12 Comparacion entre los modelos 1 y 2
+##3.14 Comparacion entre los modelos 1 y 2
 ```{r}
 #Crear un dataframe con los dos modelos y verlos en paralelo
 comparar_df <- data.frame(
@@ -907,7 +969,7 @@ print(comparar_df)
 ```
 
 
-##3.13 Predición con el Test Set/Clasificacion 
+##3.15 Predición con el Test Set/Clasificacion 
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
@@ -947,7 +1009,7 @@ print(prediccion_test_logit)
 
 ```
 
-##3.14 Gráficos de la predicción
+##3.16 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_logit$prob_pobre_logit, 
@@ -979,7 +1041,7 @@ text(x = 1:length(prop_clases),
 ```
 
 
-##3.15 Comparacion entre entrenamiento y prediccion
+##3.17 Comparacion entre entrenamiento y prediccion
 
 ```{r}
 comparacion_mod_log <- data.frame(
@@ -1011,7 +1073,7 @@ print(comparacion_mod_log)
 ```
 
 
-##3.16 Template_Logit
+##3.18 Template_Logit
 ```{r}
 write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
 ```
