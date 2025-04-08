@@ -339,7 +339,6 @@ text(x = 1:length(prop_clases_pobreza),
 ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
 ```
 
-
 ##1.9 Rebalanceo de la muestra train
 ```{r}
 # Calcular ponderadores
@@ -408,7 +407,7 @@ grilla_EN <- expand.grid(
 
 ```
 
-##2.3 Entrenar el modelo Elastic Net con Caret
+##2.3 Entrenar el modelo Elastic Net con Caret general
 ```{r}
 #Modelo Elastic Net
 #Tiempo para ejecucion 6 min
@@ -416,7 +415,7 @@ grilla_EN <- expand.grid(
 #Entrenamiento del modelo
 set.seed(123)
 
-mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
+mod_1_EN_gral <- train(Pobre~., #Modelo 1 Elastic Net
     data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
     weights = wts,  # Inclusion de penderacion de clases
@@ -430,13 +429,13 @@ mod_1_EN <- train(Pobre~., #Modelo 1 Elastic Net
 ##2.4 Resultado modelo Elastic Net
 ```{r}
 # Resumen del modelo entrenado  Elastic Net
-print(mod_1_EN)
+print(mod_1_EN_gral)
 
 # Resumen hiperparámetros 
-print(mod_1_EN$bestTune)
+print(mod_1_EN_gral$bestTune)
 
 # Resultados de validación cruzada
-plot(mod_1_EN)
+plot(mod_1_EN_gral)
 
 
 ```
@@ -444,7 +443,7 @@ plot(mod_1_EN)
 ##2.5 Estimacion de coeficientes por Elastic Net
 ```{r}
 # Usar varImp para obtener la importancia de las variables
-importancia <- varImp(mod_1_EN)
+importancia <- varImp(mod_1_EN_gral)
 
 # Convertir a dataframe y ordenar
 imp_df <- data.frame(
@@ -461,19 +460,107 @@ plot(importancia, top = 15)
 
 ```
 
+##2.6 Seleccionar variables importantes y ponderacion
+```{r}
+#Seleccion de las variables importantes según paso anterior
+variables_importantes <- c("ncotizando", "nt_trab_semanal", "Nper", 
+                         "nocupados", "nmayor_edad", "pagada", 
+                         "H_cotizando", "H_Head_ocupado", "usufructo", 
+                         "maxEducLevel", "H_Head_Educ_level", 
+                         "Dominio", "sin_titulo", "Pobre")
+train_importantes <- train_factors[, names(train_factors) %in% variables_importantes]
 
-##2.6 Predicción modelo Elastic Net
+
+```
+
+##2.7 Graficos proporcicion de la muestra variables importantes
+```{r}
+# Calcular proporción de clases (No pobre vs Pobre)
+tabla_pobreza_import <- table(train_importantes$Pobre)
+prop_clases_pobreza_import <- prop.table(tabla_pobreza_import)
+
+# Visualizar proporción de clases en un gráfico de barras
+barplot(prop_clases_pobreza_import,
+        main = "Proporción de clases de pobreza en datos de entrenamiento",
+        xlab = "Condición de pobreza",
+        ylab = "Proporción",
+        col = c("lightgreen", "coral"),
+        names.arg = c("No pobre", "Pobre"),
+        ylim = c(0, 1))
+
+# Agregar etiquetas de porcentaje
+text(x = 1:length(prop_clases_pobreza_import), 
+     y = prop_clases_pobreza + 0.05,
+     labels = paste0(round(prop_clases_pobreza_import * 100, 1), "%"),
+     cex = 0.8)
+
+# Calcular ponderadores
+n_no_pobre_import <- sum(train_importantes$Pobre == "No")
+n_pobre_import <- sum(train_importantes$Pobre == "Yes")
+pos_weight_import <- n_no_pobre_import / n_pobre_import  # Peso para la clase minoritaria (Pobre)
+
+# Crear vector de pesos
+wts_import <- ifelse(train_importantes$Pobre == "Yes", pos_weight, 1)
+
+# Calcular distribución ponderada
+tabla_ponderada_import <- c(
+  sum(wts[train_importantes$Pobre == "No"]),  # Suma de pesos para "No pobre"
+  sum(wts[train_importantes$Pobre == "Yes"])  # Suma de pesos para "Pobre"
+)
+prop_ponderada_import <- prop.table(tabla_ponderada_import)
+
+# Crear dataframe
+datos_plot_import <- data.frame(
+  Clase = rep(c("No pobre", "Pobre"), 2),
+  Proporcion = c(prop_clases_pobreza_import, prop_ponderada_import),
+  Tipo = rep(c("Original", "Ponderada"), each = 2)
+)
+
+# Crear gráfico de barras agrupadas
+ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
+  geom_text(aes(label = paste0(round(Proporcion * 100, 1), "%")), 
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 3.5) +
+  labs(title = "Proporción de clases: Original vs. Ponderada",
+       x = "Condición de pobreza",
+       y = "Proporción") +
+  scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
+  theme_minimal() +
+  ylim(0, 1)
+
+```
+
+
+##2.7 Entrenar el modelo Elastic Net con Caret variables importantes
+```{r}
+# Entrenar un nuevo modelo con el dataset reducido
+set.seed(123)
+mod_1_EN<- train(
+  Pobre ~ .,
+  data = train_importantes,
+  method = "glmnet",
+  weights = wts_import,
+  trControl = ctrl_EN,
+  tuneGrid = grilla_EN,
+  metric = "ROC",
+  preProcess = c("center", "scale"))
+```
+
+
+##2.7 Predicción modelo Elastic Net
 ```{r}
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
-                      newdata = train_factors, 
+                      newdata = train_importantes, 
                       type = "prob")[,"Yes"]
 ```
 
-##2.7 Optimización de umbral para maximizar F1 Score
+
+##2.8 Optimización de umbral para maximizar F1 Score
 ```{r}
 # Calculamos la curva PR para 100 valores de umbral
-prec_recall <- data.frame(coords(roc(response = train_factors$Pobre, predictor = prob_train), 
+prec_recall <- data.frame(coords(roc(response = train_importantes$Pobre, predictor = prob_train), 
                                 seq(0, 1, length=100), 
                                 ret=c("threshold", "precision", "recall")))
 
@@ -509,17 +596,17 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.8 Crear la curva ROC para prediccion train set Elastic Net
+##2.9 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
-roc_obj <- roc(response = train_factors$Pobre, 
+roc_obj <- roc(response = train_importantes$Pobre, 
                predictor = prob_train)
 # Calcular AUC
 auc_value <- auc(roc_obj)
 
 # Calcular punto específico en la curva ROC para el umbral 0.3
-conf_matrix <- confusionMatrix(predicciones_train, train_factors$Pobre)
+conf_matrix <- confusionMatrix(predicciones_train, train_importantes$Pobre)
 sensibilidad_umbral <- conf_matrix$byClass["Sensitivity"]
 especificidad_umbral <- conf_matrix$byClass["Specificity"]
 
@@ -560,10 +647,10 @@ ggplot() +
 
 ```
 
-##2.9 Matriz de confusion
+##2.10 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
-B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
+B_EN <- confusionMatrix(predicciones_train, train_importantes$Pobre)
 B_EN <- B_EN$table
 
 # Explicación de valores matriz de confusión
@@ -582,7 +669,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.10 Metricas Modelo Elastic Net
+##2.11 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -610,7 +697,7 @@ metrics_table_mod_1_EN <- data.frame(
 print(metrics_table_mod_1_EN)
 ```
 
-##2.11 Prediccion con el Test Set Elastic Net
+##2.12 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -647,7 +734,7 @@ prediccion_test_EN <- data.frame(
 print(prediccion_test_EN)
 ```
 
-##2.12 Gráficos de la predicción
+##2.13 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -679,7 +766,7 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.13 Template Elastic Net
+##2.14 Template Elastic Net
 ```{r}
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
@@ -1609,7 +1696,7 @@ submission <- data.frame(id = ids, Pobre = pred_clase)
 str(submission)
 ```
 
-##6.3 Template_CART
+##3.2 Template_CART
 
 ```{r}
 write.csv
