@@ -440,7 +440,28 @@ plot(mod_1_EN)
 
 ```
 
-##2.5 Predicción modelo Elastic Net
+##2.5 Estimacion de coeficientes por Elastic Net
+```{r}
+# Usar varImp para obtener la importancia de las variables
+importancia <- varImp(mod_1_EN)
+
+# Convertir a dataframe y ordenar
+imp_df <- data.frame(
+  Variable = rownames(importancia_vars$importance),
+  Importancia = importancia$importance[,1]
+)
+imp_df <- imp_df[order(imp_df$Importancia, decreasing = TRUE),]
+
+# Mostrar las 20 variables más importantes
+print(head(imp_df, 20))
+
+# Graficar las 15 variables más importantes
+plot(importancia, top = 15)
+
+```
+
+
+##2.6 Predicción modelo Elastic Net
 ```{r}
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
@@ -453,7 +474,7 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.6 Optimización de umbral para maximizar F1 Score
+##2.7 Optimización de umbral para maximizar F1 Score
 ```{r}
 # Calculamos la curva PR para 100 valores de umbral
 prec_recall <- data.frame(coords(roc(response = train_factors$Pobre, predictor = prob_train), 
@@ -492,7 +513,7 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.7 Crear la curva ROC para prediccion train set Elastic Net
+##2.8 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
@@ -543,7 +564,7 @@ ggplot() +
 
 ```
 
-##2.8 Matriz de confusion
+##2.9 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
@@ -565,7 +586,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.9 Metricas Modelo Elastic Net
+##2.10 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -591,13 +612,6 @@ metrics_table_mod_1_EN <- data.frame(
 
 # Imprimir tabla de métricas
 print(metrics_table_mod_1_EN)
-```
-
-##2.10 Explorar la importancia de las variables
-```{r}
-# Ver la importancia de las variables
-importancia <- varImp(mod_1_EN)
-plot(importancia, top = 10)  # Mostrar las 20 variables más importantes
 ```
 
 ##2.11 Prediccion con el Test Set Elastic Net
@@ -686,7 +700,6 @@ mod_1_logit<- glm(Pobre~.,
                  weights = wts) # Inclusion de penderacion de clases
 
 ```
-
 ##3.2 Resultados Estimadores Logit 
 ```{r}
 summary(mod_1_logit,type="text")
