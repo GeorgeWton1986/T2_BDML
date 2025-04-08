@@ -442,9 +442,6 @@ plot(mod_1_EN)
 
 ##2.5 Predicción modelo Elastic Net
 ```{r}
-#Umbral de decision de Probreza
-umbral <- 0.5 #Define la regla de los modelos Elastic Net y Logit 
-
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
                       newdata = train_factors, 
@@ -456,7 +453,46 @@ predicciones_train <- factor(predicciones_train, levels = levels(train_factors$P
 
 ```
 
-##2.6 Crear la curva ROC para prediccion train set Elastic Net
+##2.6 Optimización de umbral para maximizar F1 Score
+```{r}
+# Calculamos la curva PR para 100 valores de umbral
+prec_recall <- data.frame(coords(roc(response = train_factors$Pobre, predictor = prob_train), 
+                                seq(0, 1, length=100), 
+                                ret=c("threshold", "precision", "recall")))
+
+# Añadir columna de F1 Score
+prec_recall$f1_score <- 2 * (prec_recall$precision * prec_recall$recall) / 
+                          (prec_recall$precision + prec_recall$recall)
+
+# Encontrar el umbral que maximiza F1
+mejor_f1 <- max(prec_recall$f1_score, na.rm = TRUE)
+umbral_optimo <- prec_recall$threshold[which.max(prec_recall$f1_score)]
+
+print(paste("Mejor F1 Score:", round(mejor_f1, 4), 
+            "con umbral:", round(umbral_optimo, 4)))
+
+# Visualización de Precisión, Recall y F1 para diferentes umbrales
+ggplot(prec_recall, aes(x = threshold)) +
+  geom_line(aes(y = precision, color = "Precisión")) +
+  geom_line(aes(y = recall, color = "Recall")) +
+  geom_line(aes(y = f1_score, color = "F1 Score")) +
+  geom_vline(xintercept = umbral_optimo, linetype = "dashed") +
+  labs(title = "Métricas vs Umbral de Decisión",
+       x = "Umbral",
+       y = "Valor",
+       color = "Métrica") +
+  theme_minimal()
+
+# Usar el umbral óptimo para las predicciones
+umbral <- umbral_optimo  # Usar el umbral optimizado
+
+# Obtener predicciones en los datos de entrenamiento con el umbral optimizado
+predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
+predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
+
+```
+
+##2.7 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
@@ -507,7 +543,7 @@ ggplot() +
 
 ```
 
-##2.7 Matriz de confusion
+##2.8 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
@@ -529,7 +565,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.8 Metricas Modelo Elastic Net
+##2.9 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -557,14 +593,14 @@ metrics_table_mod_1_EN <- data.frame(
 print(metrics_table_mod_1_EN)
 ```
 
-##2.9 Explorar la importancia de las variables
+##2.10 Explorar la importancia de las variables
 ```{r}
 # Ver la importancia de las variables
 importancia <- varImp(mod_1_EN)
 plot(importancia, top = 10)  # Mostrar las 20 variables más importantes
 ```
 
-##2.10 Prediccion con el Test Set Elastic Net
+##2.11 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -586,9 +622,22 @@ resultados_prediccion_EN<- predictTest_EN %>%
 
 # Ver las primeras filas de los resultados
 head(resultados_prediccion_EN)
+
+# Crear un resumen de las predicciones del modelo Elastic Net
+prediccion_test_EN <- data.frame(
+  Estadística = c("Número total de predicciones", 
+                 "Hogares clasificados como pobres", 
+                 "Hogares clasificados como no pobres",
+                 "Porcentaje clasificado como pobre"),
+  Valor = c(nrow(resultados_prediccion_EN),
+           sum(resultados_prediccion_EN$pred_probre_EN),
+           nrow(resultados_prediccion_EN) - sum(resultados_prediccion_EN$pred_probre_EN),
+           sprintf("%.2f%%", 100 * sum(resultados_prediccion_EN$pred_probre_EN) / nrow(resultados_prediccion_EN)))
+)
+print(prediccion_test_EN)
 ```
 
-##2.11 Gráficos de la predicción
+##2.12 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -620,7 +669,7 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.12 Template Elastic Net
+##2.13 Template Elastic Net
 ```{r}
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
@@ -1075,7 +1124,7 @@ print(comparacion_mod_log)
 
 ##3.18 Template_Logit
 ```{r}
-write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/01042025sample_equipo4_Logit.csv", row.names = FALSE)
+write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/08042025sample_equipo4_Logit.csv", row.names = FALSE)
 ```
 
 
