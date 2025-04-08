@@ -426,7 +426,7 @@ mod_1_EN_gral <- train(Pobre~., #Modelo 1 Elastic Net
     )
 ```
 
-##2.4 Resultado modelo Elastic Net
+##2.4 Resultado modelo Elastic Net General
 ```{r}
 # Resumen del modelo entrenado  Elastic Net
 print(mod_1_EN_gral)
@@ -778,9 +778,9 @@ write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/On
 ```{r}
 #Calculo de los estimadores Logit
 mod_1_logit<- glm(Pobre~., 
-                 data = train_factors, 
+                 data = train_importantes, 
                  family = "binomial",
-                 weights = wts) # Inclusion de penderacion de clases
+                 weights = wts_import) # Inclusion de penderacion de clases
 
 ```
 ##3.2 Resultados Estimadores Logit 
@@ -791,9 +791,9 @@ summary(mod_1_logit,type="text")
 ##3.3 Probabilidad Logit
 ```{r}
 #Calculo de probabilidades
-prob_logit<- train_factors %>% 
+prob_logit<- train_importantes %>% 
   mutate(prob_hat=predict(mod_1_logit,
-                          newdata = train_factors, 
+                          newdata = train_importantes, 
                           type = "response"))
 
 
@@ -920,12 +920,12 @@ ctrl_logit<- trainControl(method = "cv",
 #Tiempo de ejecucion 35 seg
 set.seed(123)
 mod_2_logit <- train(Pobre~. ,
-                     data = train_factors, 
+                     data = train_importantes, 
                      method = "glm",
                      family = "binomial",
                      trControl = ctrl_logit,
                      metric = "Accuracy",
-                     weights = wts # Inclusion de penderacion de clases
+                     weights = wts_import # Inclusion de penderacion de clases
                      )
 
 # Ver resultados
@@ -941,7 +941,7 @@ head(mod_2_logit$pred)
 ```{r}
 # Obtener predicciones en los datos de entrenamiento
 predicciones_train_cv <- predict(mod_2_logit, 
-                                 newdata = train_factors,
+                                 newdata = train_importantes,
                                  type = "prob")
 
 umbral # Bayes Rule #Ver variable Umbral
@@ -1004,7 +1004,7 @@ ggplot() +
 ##3.11 Matriz de Confusion Logit
 ```{r}
 # Matriz de confusión del modelo con validación cruzada
-B_cv <- confusionMatrix(predicciones_umbral, train_factors$Pobre)
+B_cv <- confusionMatrix(predicciones_umbral, train_importantes$Pobre)
 B_cv <- B_cv$table
 
 
@@ -1121,7 +1121,7 @@ predictTest_logit <- test_factors %>%
     prob_pobre_logit = predict(mod_2_logit, 
                          newdata = test_factors, 
                          type = "prob")[,"Yes"],# Probabilidad de ser "Pobre" ("Yes")
-    pred_pobre_cat_logit = ifelse(prob_pobre_logit > 0.4, "Yes", "No"), #Cambio del umbral de referencia
+    pred_pobre_cat_logit = ifelse(prob_pobre_logit > umbral, "Yes", "No"), #Cambio del umbral de referencia
     pred_pobre_logit = ifelse(pred_pobre_cat_logit == "Yes", 1, 0)# Predicción numérica (1/0)
   )
 
