@@ -19,7 +19,9 @@ p_load(tidyverse, # tidy-data
        utils,
        rpart,
        rpart.plot,
-       xgboost)
+       xgboost,
+       pROC,
+       ggplot2)
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
@@ -401,16 +403,68 @@ plot(mod_1_EN)
 umbral <- 0.3
 
 #obtener la probabilidad de los datos de entrenamiento
-prob_train <- predict(mod_1_EN, newdata = train_factors, type = "prob")[,"Yes"]
+prob_train <- predict(mod_1_EN, 
+                      newdata = train_factors, 
+                      type = "prob")[,"Yes"]
 
-# Obtener predicciones en los datos de entrenamiento
+# Obtener predicciones en los datos de entrenamiento de acuerdo con el umbral
 predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
 predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
 
+```
 
+##2.6 Crear la curva ROC para prediccion train set
+```{r}
+# Crear objeto ROC
+
+roc_obj <- roc(response = train_factors$Pobre, 
+               predictor = prob_train)
+# Calcular AUC
+auc_value <- auc(roc_obj)
+
+# Calcular punto específico en la curva ROC para el umbral 0.3
+conf_matrix <- confusionMatrix(predicciones_train, train_factors$Pobre)
+sensibilidad_umbral <- conf_matrix$byClass["Sensitivity"]
+especificidad_umbral <- conf_matrix$byClass["Specificity"]
+
+# Extraer datos para ggplot
+roc_data <- data.frame(
+  Especificidad = 1 - roc_obj$specificities,
+  Sensibilidad = roc_obj$sensitivities
+)
+
+# Punto para el umbral elegido
+punto_umbral <- data.frame(
+  Especificidad = 1 - especificidad_umbral,
+  Sensibilidad = sensibilidad_umbral
+)
+
+# Crear gráfico con ggplot2
+ggplot() +
+  geom_line(data = roc_data, aes(x = Especificidad, y = Sensibilidad), 
+            color = "blue", size = 1) +
+  geom_point(data = punto_umbral, aes(x = Especificidad, y = Sensibilidad), 
+             color = "red", size = 3) +
+  geom_text(data = punto_umbral, 
+            aes(x = Especificidad, y = Sensibilidad, 
+                label = paste("Umbral =", umbral)),
+            hjust = -0.2, vjust = -0.5, color = "red") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Curva ROC - Modelo Elastic Net",
+    subtitle = paste("AUC =", round(auc_value, 4)),
+    x = "1 - Especificidad (Tasa de Falsos Positivos)",
+    y = "Sensibilidad (Tasa de Verdaderos Positivos)"
+  ) +
+  theme_minimal() +
+  coord_equal() +
+  annotate("text", x = 0.75, y = 0.25, 
+           label = paste("AUC =", round(auc_value, 4)), 
+           color = "blue", size = 5)
 
 ```
-##2.6 Matriz de confusion
+
+##2.7 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_factors$Pobre)
@@ -432,7 +486,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.6 Metricas Modelo Elastic Net
+##2.8 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -460,13 +514,14 @@ metrics_table_mod_1_EN <- data.frame(
 print(metrics_table_mod_1_EN)
 ```
 
-##2.6 Explorar la importancia de las variables
+##2.9 Explorar la importancia de las variables
 ```{r}
 # Ver la importancia de las variables
 importancia <- varImp(mod_1_EN)
 plot(importancia, top = 10)  # Mostrar las 20 variables más importantes
 ```
-##2.6 Prediccion con el Test Set Elastic Net
+
+##2.10 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -489,7 +544,8 @@ resultados_prediccion_EN<- predictTest_EN %>%
 # Ver las primeras filas de los resultados
 head(resultados_prediccion_EN)
 ```
-##2.7 Gráficos de la predicción
+
+##2.11 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -521,7 +577,7 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.8 Template Elastic Net
+##2.12 Template Elastic Net
 ```{r}
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
