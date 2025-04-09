@@ -314,6 +314,7 @@ test_factors<- test %>%
          maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
 
 ```
+
 ##1.8 Grafica Revision del Balance de Clases Train
 ```{r}
 # Calcular proporción de clases (No pobre vs Pobre)
@@ -695,6 +696,7 @@ ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
 
 ##2.13 Entrenar el modelo Elastic Net con Caret variables importantes
 ```{r}
+#Tiempo de ejecucion 15 minutos
 #Configacion de la validacion Cruzada
 ctrl_EN_import <- trainControl(method = "cv",
                     number = 10,
@@ -1050,11 +1052,7 @@ ggplot(conf_mat_combined, aes(x = Actual, y = Predicted, fill = Count)) +
 ```
 
 
-
-
-
-
-##2.14 Prediccion con el Test Set Elastic Net
+##2.20 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -1091,7 +1089,7 @@ prediccion_test_EN <- data.frame(
 print(prediccion_test_EN)
 ```
 
-##2.15 Gráficos de la predicción
+##2.21 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -1123,7 +1121,7 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.10 Template Elastic Net
+##2.22 Template Elastic Net
 ```{r}
 write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
