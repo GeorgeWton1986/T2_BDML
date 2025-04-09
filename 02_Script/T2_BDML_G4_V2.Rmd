@@ -589,19 +589,6 @@ metrics_table_mod_1_EN_gral <- data.frame(
 print(metrics_table_mod_1_EN_gral)
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 ##2.10 Estimacion de coeficientes por Elastic Net General
 ```{r}
 # Usar varImp para obtener la importancia de las variables
