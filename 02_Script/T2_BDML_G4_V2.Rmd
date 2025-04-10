@@ -21,7 +21,8 @@ p_load(tidyverse, # tidy-data
        rpart.plot,
        xgboost,
        pROC,
-       ggplot2)
+       ggplot2,
+       skimr)
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
@@ -153,6 +154,13 @@ test_hogares %>%
 
 colnames(test_personas)
 ```
+## B.3 Estadísticas descriptivas
+
+```{r}
+skim(train)
+skim(test)
+```
+
 
 #1. Pre procesamiento de Train personas y Train hogares
 
@@ -314,29 +322,35 @@ test_factors<- test %>%
          maxEducLevel = factor(maxEducLevel,levels = c(0:6),labels = c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria') ))
 
 ```
+
 ##1.8 Grafica Revision del Balance de Clases Train
 ```{r}
 # Calcular proporción de clases (No pobre vs Pobre)
 tabla_pobreza <- table(train_factors$Pobre)
 prop_clases_pobreza <- prop.table(tabla_pobreza)
 
+
+# Abrir el dispositivo gráfico PNG
+png("../04_Views/GRÁFICO1-PROPORCIÓN DE CLASES DE POBREZA EN DATOS DE ENTRENAMIENTO.png", 
+    width = 800, height = 600, res = 150)
+
 # Visualizar proporción de clases en un gráfico de barras
-barplot(prop_clases_pobreza,
-        main = "Proporción de clases de pobreza en datos de entrenamiento",
-        xlab = "Condición de pobreza",
-        ylab = "Proporción",
-        col = c("lightgreen", "coral"),
-        names.arg = c("No pobre", "Pobre"),
-        ylim = c(0, 1))
+bp1 <- barplot(prop_clases_pobreza,
+               main = "Proporción de clases de pobreza en datos de entrenamiento",
+               xlab = "Condición de pobreza",
+               ylab = "Proporción",
+               col = c("lightgreen", "coral"),
+               names.arg = c("No pobre", "Pobre"),
+               ylim = c(0, 1))
 
 # Agregar etiquetas de porcentaje
-text(x = 1:length(prop_clases_pobreza), 
+text(x = bp1, 
      y = prop_clases_pobreza + 0.05,
      labels = paste0(round(prop_clases_pobreza * 100, 1), "%"),
      cex = 0.8)
 
-# Guardar  
-ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
+# Cerrar el dispositivo gráfico
+dev.off()
 ```
 
 ##1.9 Rebalanceo de la muestra train
@@ -378,15 +392,19 @@ ggplot(datos_plot, aes(x = Clase, y = Proporcion, fill = Tipo)) +
        x = "Condición de pobreza",
        y = "Proporción") +
   scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
-  theme_minimal() +
+  theme_bw() +
   ylim(0, 1)
+
+# Guardar el gráfico con una ruta relativa a la carpeta
+ggsave("../04_Views/GRAFICO2-PROPORCION_DE_CLASES.png", dpi = 300)
 ```
 
 #2. Entrenamiento Modelo Elastic Net
-##2.1 Modelo Elastic Net con Caret
+##2.1 Modelo Elastic Net con Caret General
 ```{r}
 #Configacion de la validacion Cruzada
-ctrl_EN<- trainControl(method = "cv",
+#No tiene la muestra rebalanceada
+ctrl_EN_gral <- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
                     savePredictions = TRUE, 
@@ -394,20 +412,20 @@ ctrl_EN<- trainControl(method = "cv",
                     )
 ```
 
-##2.2 Definir la cuadricula de hiperparametros
+##2.2 Definir la cuadricula de hiperparametros General
 ```{r}
 #Definir la grilla de los hiperparametros alfa y lambda
 # El hipeparametro alfa controla Ridge (0) y Lasso (1)
 # El hipeparametro lambda controla la intensidad de la regularización
 
-grilla_EN <- expand.grid(
+grilla_EN_gral <- expand.grid(
   alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
   lambda= 10^seq(-4, -1, length = 10) #Logaritmos
 )
 
 ```
 
-##2.3 Entrenar el modelo Elastic Net con Caret general
+##2.3 Entrenar el modelo Elastic Net con Caret General
 ```{r}
 #Modelo Elastic Net
 #Tiempo para ejecucion 6 min
@@ -418,9 +436,8 @@ set.seed(123)
 mod_1_EN_gral <- train(Pobre~., #Modelo 1 Elastic Net
     data = train_factors, #Datos de entrenamiento en factores
     method = "glmnet", #Metodo de cálculo Elastic Net
-    weights = wts,  # Inclusion de penderacion de clases
-    trControl = ctrl_EN, #Validacion Cruzada
-    tuneGrid = grilla_EN, #Grilla de Hiperparametros
+    trControl = ctrl_EN_gral, #Validacion Cruzada
+    tuneGrid = grilla_EN_gral, #Grilla de Hiperparametros
     metric = "ROC",
     preProcess = c("center","scale","zv") #Preprocesamiento
     )
@@ -440,7 +457,163 @@ plot(mod_1_EN_gral)
 
 ```
 
-##2.5 Estimacion de coeficientes por Elastic Net
+##2.5 Predicción modelo Elastic Net General
+```{r}
+#obtener la probabilidad de los datos de entrenamiento
+prob_train_gral <- predict(mod_1_EN_gral, 
+                      newdata = train_factors, 
+                      type = "prob")[,"Yes"]
+```
+
+##2.6 Optimización de umbral para maximizar F1 Score General
+```{r}
+# Calculamos la curva PR para 100 valores de umbral
+prec_recall <- data.frame(coords(roc(response = train_factors$Pobre, predictor = prob_train_gral), 
+                                seq(0, 1, length=100), 
+                                ret=c("threshold", "precision", "recall")))
+
+# Añadir columna de F1 Score
+prec_recall$f1_score <- 2 * (prec_recall$precision * prec_recall$recall) / 
+                          (prec_recall$precision + prec_recall$recall)
+
+# Encontrar el umbral que maximiza F1
+mejor_f1 <- max(prec_recall$f1_score, na.rm = TRUE)
+umbral_optimo <- prec_recall$threshold[which.max(prec_recall$f1_score)]
+
+print(paste("Mejor F1 Score:", round(mejor_f1, 4), 
+            "con umbral:", round(umbral_optimo, 4)))
+
+# Visualización de Precisión, Recall y F1 para diferentes umbrales
+graf_metricas_EN_Gen <- ggplot(prec_recall, aes(x = threshold)) +
+  geom_line(aes(y = precision, color = "Precisión")) +
+  geom_line(aes(y = recall, color = "Recall")) +
+  geom_line(aes(y = f1_score, color = "F1 Score")) +
+  geom_vline(xintercept = umbral_optimo, linetype = "dashed") +
+  labs(title = "Métricas vs Umbral de Decisión",
+       x = "Umbral",
+       y = "Valor",
+       color = "Métrica") +
+  theme_bw()
+
+# Guardar gráfico
+ggsave("../04_Views/GRAFICO3-MÉTRICAS_vs_UMBRAL_DECISION.png", plot = graf_metricas_EN_Gen, dpi = 300, width = 8, height = 6)
+
+# Usar el umbral óptimo para las predicciones
+umbral_gral <- umbral_optimo  # Usar el umbral optimizado
+
+# Obtener predicciones en los datos de entrenamiento con el umbral optimizado
+predicciones_train_gral <- ifelse(prob_train_gral > umbral_gral, "Yes", "No")
+predicciones_train_gral <- factor(predicciones_train_gral, levels = levels(train_factors$Pobre))
+
+```
+
+##2.7 Crear la curva ROC para prediccion train set Elastic Net General
+```{r}
+# Crear objeto ROC
+
+roc_obj_gral <- roc(response = train_factors$Pobre, 
+               predictor = prob_train_gral)
+# Calcular AUC
+auc_value_gral <- auc(roc_obj_gral)
+
+# Calcular punto específico en la curva ROC para el umbral 0.3
+conf_matrix <- confusionMatrix(predicciones_train_gral, train_factors$Pobre)
+sensibilidad_umbral_gral <- conf_matrix$byClass["Sensitivity"]
+especificidad_umbral_gral <- conf_matrix$byClass["Specificity"]
+
+# Extraer datos para ggplot
+roc_data_gral <- data.frame(
+  Especificidad = 1 - roc_obj_gral$specificities,
+  Sensibilidad = roc_obj_gral$sensitivities
+)
+
+# Punto para el umbral elegido
+punto_umbral_gral <- data.frame(
+  Especificidad = 1 - especificidad_umbral_gral,
+  Sensibilidad = sensibilidad_umbral_gral
+)
+
+# Crear gráfico con ggplot2
+graf_roc_EN_gen <- ggplot() +
+  geom_line(data = roc_data_gral, aes(x = Especificidad, y = Sensibilidad), 
+            color = "blue", size = 1) +
+  geom_point(data = punto_umbral_gral, aes(x = Especificidad, y = Sensibilidad), 
+             color = "red", size = 3) +
+  geom_text(data = punto_umbral_gral, 
+            aes(x = Especificidad, y = Sensibilidad, 
+                label = paste("Umbral =", umbral_gral)),
+            hjust = -0.2, vjust = -0.5, color = "red") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Curva ROC - Modelo Elastic Net",
+    subtitle = paste("AUC =", round(auc_value_gral, 4)),
+    x = "1 - Especificidad (Tasa de Falsos Positivos)",
+    y = "Sensibilidad (Tasa de Verdaderos Positivos)"
+  ) +
+  theme_minimal() +
+  coord_equal() +
+  annotate("text", x = 0.75, y = 0.25, 
+           label = paste("AUC =", round(auc_value_gral, 4)), 
+           color = "blue", size = 5)
+
+# Guardar
+ggsave("../04_Views/GRAFICO4-CURVA_ROC_ELASTIC_NET.png", 
+       plot = graf_roc_EN_gen, dpi = 300, width = 8, height = 6)
+
+```
+
+##2.8 Matriz de confusion General
+```{r}
+# Matriz de confusión del modelo Elastic Net
+B_EN_gral <- confusionMatrix(predicciones_train_gral, train_factors$Pobre)
+B_EN_gral <- B_EN_gral$table
+
+# Explicación de valores matriz de confusión
+TN_train_EN_gral <- B_EN_gral[1,1]  # Verdaderos Negativos
+FP_train_EN_gral <- B_EN_gral[1,2]  # Falsos Positivos
+FN_train_EN_gral <- B_EN_gral[2,1]  # Falsos Negativos
+TP_train_EN_gral <- B_EN_gral[2,2]  # Verdaderos Positivos
+
+# Crear tabla de conteos
+counts_table_EN_gral <- data.frame(
+  categoría = c("Verdaderos Negativos (TN)", "Falsos Positivos (FP)", 
+                "Falsos Negativos (FN)", "Verdaderos Positivos (TP)"),
+  conteo = c(TN_train_EN_gral, FP_train_EN_gral, FN_train_EN_gral, TP_train_EN_gral)
+)
+
+print(counts_table_EN_gral)
+```
+
+##2.9 Metricas Modelo Elastic Net General
+```{r}
+# Calcular métricas
+accuracy_train_EN_gral <- (TN_train_EN_gral + TP_train_EN_gral) / (TN_train_EN_gral + FP_train_EN_gral + FN_train_EN_gral + TP_train_EN_gral)
+precision_train_EN_gral <- TP_train_EN_gral / (TP_train_EN_gral + FP_train_EN_gral)
+recall_train_EN_gral <- TP_train_EN_gral / (TP_train_EN_gral + FN_train_EN_gral)
+specificity_train_EN_gral <- TN_train_EN_gral / (TN_train_EN_gral + FP_train_EN_gral)
+f1_score_train_EN_gral <- 2 * (precision_train_EN_gral * recall_train_EN_gral) / (precision_train_EN_gral + recall_train_EN_gral)
+error_rate_train_EN_gral <- 1 - accuracy_train_EN_gral
+
+# Crear un data frame con los resultados
+metrics_table_mod_1_EN_gral <- data.frame(
+  metrica_train_cv_gral = c("Accuracy (Exactitud)", "Precision (Precisión)", "Recall (Sensibilidad)", 
+              "Specificity (Especificidad)", "F1 Score", "Error Rate (Tasa de error)"),
+  Valor_gral = c(accuracy_train_EN_gral, precision_train_EN_gral, recall_train_EN_gral, specificity_train_EN_gral, f1_score_train_EN_gral, error_rate_train_EN_gral),
+    Descripción = c(
+    "Proporción total de predicciones correctas",
+    "De los predichos como pobres, cuántos realmente lo son",
+    "De los realmente pobres, cuántos fueron identificados correctamente",
+    "De los realmente no pobres, cuántos fueron identificados correctamente",
+    "Media armónica entre precisión y recall",
+    "Proporción de predicciones incorrectas"
+))
+
+# Imprimir tabla de métricas
+print(metrics_table_mod_1_EN_gral)
+```
+
+
+##2.10 Estimacion de coeficientes por Elastic Net General
 ```{r}
 # Usar varImp para obtener la importancia de las variables
 importancia <- varImp(mod_1_EN_gral)
@@ -456,11 +629,26 @@ imp_df <- imp_df[order(imp_df$Importancia, decreasing = TRUE),]
 print(head(imp_df, 20))
 
 # Graficar las 15 variables más importantes
-plot(importancia, top = 15)
+top15 <- head(imp_df, 15)
+
+# Crear gráfico con ggplot
+grafico_imp_en <- ggplot(top15, aes(x = reorder(Variable, Importancia), y = Importancia)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  coord_flip() +
+  labs(title = "Importancia de Variables - Modelo Elastic Net",
+       x = "Variables", y = "Importancia escalada") +
+  theme_bw()
+
+# Guardar como imagen PNG
+ggsave("../04_Views/GRÁFICO5-IMPORTANCIA-VAR-ELASTIC-NET.png", 
+       plot = grafico_imp_en, width = 8, height = 6)
+
+
+#plot(importancia, top = 15)
 
 ```
 
-##2.6 Seleccionar variables importantes y ponderacion
+##2.11 Seleccionar variables importantes y ponderacion
 ```{r}
 #Seleccion de las variables importantes según paso anterior
 variables_importantes <- c("ncotizando", "nt_trab_semanal", "Nper", 
@@ -473,11 +661,14 @@ train_importantes <- train_factors[, names(train_factors) %in% variables_importa
 
 ```
 
-##2.7 Graficos proporcicion de la muestra variables importantes
+##2.12 Graficos proporcicion de la muestra variables importantes
 ```{r}
 # Calcular proporción de clases (No pobre vs Pobre)
 tabla_pobreza_import <- table(train_importantes$Pobre)
 prop_clases_pobreza_import <- prop.table(tabla_pobreza_import)
+
+# Abrir el dispositivo gráfico
+png("../04_Views/GRÁFICO5-PROPORCIÓN DE CLASES DE POBRAZA IMPORTANTES EN ENTRENAMIENTO.png", width = 800, height = 600, res = 150)
 
 # Visualizar proporción de clases en un gráfico de barras
 barplot(prop_clases_pobreza_import,
@@ -490,9 +681,12 @@ barplot(prop_clases_pobreza_import,
 
 # Agregar etiquetas de porcentaje
 text(x = 1:length(prop_clases_pobreza_import), 
-     y = prop_clases_pobreza + 0.05,
+     y = prop_clases_pobreza_import + 0.05,
      labels = paste0(round(prop_clases_pobreza_import * 100, 1), "%"),
      cex = 0.8)
+
+# Cerrar el dispositivo gráfico
+dev.off()
 
 # Calcular ponderadores
 n_no_pobre_import <- sum(train_importantes$Pobre == "No")
@@ -500,12 +694,12 @@ n_pobre_import <- sum(train_importantes$Pobre == "Yes")
 pos_weight_import <- n_no_pobre_import / n_pobre_import  # Peso para la clase minoritaria (Pobre)
 
 # Crear vector de pesos
-wts_import <- ifelse(train_importantes$Pobre == "Yes", pos_weight, 1)
+wts_import <- ifelse(train_importantes$Pobre == "Yes", pos_weight_import, 1)
 
 # Calcular distribución ponderada
 tabla_ponderada_import <- c(
-  sum(wts[train_importantes$Pobre == "No"]),  # Suma de pesos para "No pobre"
-  sum(wts[train_importantes$Pobre == "Yes"])  # Suma de pesos para "Pobre"
+  sum(wts_import[train_importantes$Pobre == "No"]),  # Suma de pesos para "No pobre"
+  sum(wts_import[train_importantes$Pobre == "Yes"])  # Suma de pesos para "Pobre"
 )
 prop_ponderada_import <- prop.table(tabla_ponderada_import)
 
@@ -517,7 +711,7 @@ datos_plot_import <- data.frame(
 )
 
 # Crear gráfico de barras agrupadas
-ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
+graf_comp_clases <- ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
   geom_text(aes(label = paste0(round(Proporcion * 100, 1), "%")), 
             position = position_dodge(width = 0.9),
@@ -529,26 +723,98 @@ ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
   theme_minimal() +
   ylim(0, 1)
 
+# Guardar 
+ggsave("../04_Views/GRAFICO-PROPORCION-CLASES-ORIGINAL-VS-PONDERADA.png", 
+       plot = graf_comp_clases, width = 8, height = 6)
+
 ```
 
 
-##2.7 Entrenar el modelo Elastic Net con Caret variables importantes
+##2.13 Crear una funcion para el optimizar el F1 Scores
 ```{r}
+f1_summary <- function(data, lev = NULL, model = NULL) {
+  # Asegurarse que los niveles estén correctamente identificados
+  if(is.null(lev)) lev <- levels(data$obs)
+  
+  # Identificar la clase positiva (asumimos que es la segunda, "Yes")
+  positive_class <- lev[2]
+  
+  # Extraer las probabilidades de la clase positiva
+  probs <- data[, positive_class]
+  
+  # Convertir a predicciones binarias usando umbral
+  pred_class <- factor(ifelse(probs >= 0.3, positive_class, lev[1]), levels = lev)
+  
+  # Calcular precisión (precision)
+  precision <- sum(pred_class == positive_class & data$obs == positive_class) / 
+               sum(pred_class == positive_class)
+  
+  # Calcular exhaustividad (recall)
+  recall <- sum(pred_class == positive_class & data$obs == positive_class) / 
+            sum(data$obs == positive_class)
+  
+  # Calcular F1
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  # En caso de NaN (por ejemplo, si precision y recall son 0)
+  if(is.nan(f1)) f1 <- 0
+  
+  # Devolver un vector nombrado con F1
+  result <- c(F1 = f1)
+  names(result) <- "F1"
+  
+  return(result)
+}
+```
+
+
+##2.13 Entrenar el modelo Elastic Net con Caret variables importantes
+```{r}
+#Tiempo de ejecucion 15 minutos
+#Configacion de la validacion Cruzada
+ctrl_EN_import <- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    savePredictions = TRUE, 
+                    summaryFunction = f1_summary
+                    )
+
+#Definir la grilla de los hiperparametros alfa y lambda
+# El hipeparametro alfa controla Ridge (0) y Lasso (1)
+# El hipeparametro lambda controla la intensidad de la regularización
+
+grilla_EN_import <- expand.grid(
+  alpha= seq(0, 1, by = 0.2),
+  lambda= 10^seq(-4, -1, length = 10)) #Logaritmos
+
 # Entrenar un nuevo modelo con el dataset reducido
 set.seed(123)
 mod_1_EN<- train(
   Pobre ~ .,
   data = train_importantes,
   method = "glmnet",
-  weights = wts_import,
-  trControl = ctrl_EN,
-  tuneGrid = grilla_EN,
-  metric = "ROC",
-  preProcess = c("center", "scale"))
+  weights = wts_import, #Muestra rebalanceada
+  trControl = ctrl_EN_import,
+  tuneGrid = grilla_EN_import,
+  metric = "F1",
+  preProcess = c("center", "scale","zv"))
+
+```
+
+##2.14 Resultado modelo Elastic Net
+```{r}
+# Resumen del modelo entrenado  Elastic Net
+print(mod_1_EN)
+
+# Resumen hiperparámetros 
+print(mod_1_EN$bestTune)
+
+# Resultados de validación cruzada
+plot(mod_1_EN)
 ```
 
 
-##2.8 Predicción modelo Elastic Net
+##2.14 Predicción modelo Elastic Net
 ```{r}
 #obtener la probabilidad de los datos de entrenamiento
 prob_train <- predict(mod_1_EN, 
@@ -557,7 +823,7 @@ prob_train <- predict(mod_1_EN,
 ```
 
 
-##2.9 Optimización de umbral para maximizar F1 Score
+##2.15 Optimización de umbral para maximizar F1 Score
 ```{r}
 # Calculamos la curva PR para 100 valores de umbral
 prec_recall <- data.frame(coords(roc(response = train_importantes$Pobre, predictor = prob_train), 
@@ -592,11 +858,11 @@ umbral <- umbral_optimo  # Usar el umbral optimizado
 
 # Obtener predicciones en los datos de entrenamiento con el umbral optimizado
 predicciones_train <- ifelse(prob_train > umbral, "Yes", "No")
-predicciones_train <- factor(predicciones_train, levels = levels(train_factors$Pobre))
+predicciones_train <- factor(predicciones_train, levels = levels(train_importantes$Pobre))
 
 ```
 
-##2.10 Crear la curva ROC para prediccion train set Elastic Net
+##2.16 Crear la curva ROC para prediccion train set Elastic Net
 ```{r}
 # Crear objeto ROC
 
@@ -647,7 +913,7 @@ ggplot() +
 
 ```
 
-##2.11 Matriz de confusion
+##2.17 Matriz de confusion
 ```{r}
 # Matriz de confusión del modelo Elastic Net
 B_EN <- confusionMatrix(predicciones_train, train_importantes$Pobre)
@@ -669,7 +935,7 @@ counts_table_EN <- data.frame(
 print(counts_table_EN)
 ```
 
-##2.12 Metricas Modelo Elastic Net
+##2.18 Metricas Modelo Elastic Net
 ```{r}
 # Calcular métricas
 accuracy_train_EN <- (TN_train_EN + TP_train_EN) / (TN_train_EN + FP_train_EN + FN_train_EN + TP_train_EN)
@@ -697,7 +963,169 @@ metrics_table_mod_1_EN <- data.frame(
 print(metrics_table_mod_1_EN)
 ```
 
-##2.13 Prediccion con el Test Set Elastic Net
+## 2.19 Comparacion entre el modelo general y el modelo de variables importantes
+
+```{r}
+# 1. Comparación de métricas
+comparacion_metricas <- data.frame(
+  Métrica = c("Accuracy", "Precision", "Recall", "Specificity", "F1 Score", "AUC"),
+  Modelo_General = c(
+    accuracy_train_EN_gral, 
+    precision_train_EN_gral, 
+    recall_train_EN_gral, 
+    specificity_train_EN_gral, 
+    f1_score_train_EN_gral,
+    auc_value_gral
+  ),
+  Modelo_Variables_Importantes = c(
+    accuracy_train_EN, 
+    precision_train_EN, 
+    recall_train_EN, 
+    specificity_train_EN, 
+    f1_score_train_EN,
+    auc_value
+  )
+)
+
+# Reordenar datos para visualización
+comparacion_metricas$Diferencia <- comparacion_metricas$Modelo_Variables_Importantes - comparacion_metricas$Modelo_General
+comparacion_metricas$Mejora_Porcentual <- (comparacion_metricas$Diferencia / comparacion_metricas$Modelo_General) * 100
+
+# Mostrar tabla de comparación formateada
+comparacion_formateada <- comparacion_metricas %>%
+  mutate(
+    Modelo_General = round(Modelo_General, 4),
+    Modelo_Variables_Importantes = round(Modelo_Variables_Importantes, 4),
+    Diferencia = round(Diferencia, 4),
+    Mejora_Porcentual = round(Mejora_Porcentual, 2)
+  )
+
+print(comparacion_formateada)
+
+# 2. Comparación gráfica de métricas
+comparacion_long <- comparacion_metricas %>%
+  tidyr::pivot_longer(
+    cols = c(Modelo_General, Modelo_Variables_Importantes),
+    names_to = "Modelo",
+    values_to = "Valor"
+  ) %>%
+  filter(Métrica != "AUC")  # AUC se visualizará en la curva ROC
+
+# Gráfico comparativo de métricas
+ggplot(comparacion_long, aes(x = Métrica, y = Valor, fill = Modelo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
+  geom_text(aes(label = round(Valor, 3)), 
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 3) +
+  labs(title = "Comparación de métricas entre modelos",
+       subtitle = "Modelo general vs. Modelo con variables importantes",
+       x = "Métrica",
+       y = "Valor") +
+  scale_fill_manual(values = c("Modelo_General" = "skyblue", 
+                               "Modelo_Variables_Importantes" = "coral")) +
+  theme_minimal() +
+  ylim(0, max(comparacion_long$Valor) * 1.1)
+
+# 3. Comparación de curvas ROC
+# Extraer datos para ambas curvas ROC
+roc_data_general <- data.frame(
+  Especificidad = 1 - roc_obj_gral$specificities,
+  Sensibilidad = roc_obj_gral$sensitivities,
+  Modelo = "Modelo General"
+)
+
+roc_data_vars_imp <- data.frame(
+  Especificidad = 1 - roc_obj$specificities,
+  Sensibilidad = roc_obj$sensitivities,
+  Modelo = "Modelo Variables Importantes"
+)
+
+# Combinar datos de ambas curvas
+roc_data_combined <- rbind(roc_data_general, roc_data_vars_imp)
+
+# Puntos para los umbrales elegidos
+puntos_umbral <- data.frame(
+  Especificidad = c(1 - especificidad_umbral_gral, 1 - especificidad_umbral),
+  Sensibilidad = c(sensibilidad_umbral_gral, sensibilidad_umbral),
+  Modelo = c("Modelo General", "Modelo Variables Importantes"),
+  Umbral = c(umbral_gral, umbral)
+)
+
+# Crear gráfico comparativo de curvas ROC
+ggplot() +
+  geom_line(data = roc_data_combined, 
+            aes(x = Especificidad, y = Sensibilidad, color = Modelo), 
+            size = 1) +
+  geom_point(data = puntos_umbral, 
+             aes(x = Especificidad, y = Sensibilidad, color = Modelo),
+             size = 3) +
+  geom_text(data = puntos_umbral,
+            aes(x = Especificidad, y = Sensibilidad, 
+                label = paste("Umbral =", round(Umbral, 3)), color = Modelo),
+            hjust = -0.1, vjust = -0.5, size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Comparación de Curvas ROC",
+    subtitle = paste("AUC General =", round(auc_value_gral, 4), 
+                     "| AUC Variables Importantes =", round(auc_value, 4)),
+    x = "1 - Especificidad (Tasa de Falsos Positivos)",
+    y = "Sensibilidad (Tasa de Verdaderos Positivos)"
+  ) +
+  scale_color_manual(values = c("Modelo General" = "skyblue", 
+                               "Modelo Variables Importantes" = "coral")) +
+  theme_minimal() +
+  coord_equal() +
+  annotate("text", x = 0.75, y = 0.25, 
+           label = paste("Mejora en AUC:", 
+                         round((auc_value - auc_value_gral) * 100, 2), "%"), 
+           color = "darkgreen", size = 4)
+
+# 4. Comparación de hiperparámetros óptimos
+hiperparametros <- data.frame(
+  Modelo = c("Modelo General", "Modelo Variables Importantes"),
+  Alpha = c(mod_1_EN_gral$bestTune$alpha, mod_1_EN$bestTune$alpha),
+  Lambda = c(mod_1_EN_gral$bestTune$lambda, mod_1_EN$bestTune$lambda)
+)
+
+print(hiperparametros)
+
+# 5. Comparación de matrices de confusión
+# Convertir matrices de confusión a formato largo para visualización
+conf_mat_general <- as.data.frame.matrix(B_EN_gral)
+conf_mat_general$Predicted <- rownames(conf_mat_general)
+conf_mat_general_long <- reshape2::melt(conf_mat_general, id.vars = "Predicted", 
+                                       variable.name = "Actual", value.name = "Count")
+conf_mat_general_long$Modelo <- "Modelo General"
+
+conf_mat_vars_imp <- as.data.frame.matrix(B_EN)
+conf_mat_vars_imp$Predicted <- rownames(conf_mat_vars_imp)
+conf_mat_vars_imp_long <- reshape2::melt(conf_mat_vars_imp, id.vars = "Predicted", 
+                                        variable.name = "Actual", value.name = "Count")
+conf_mat_vars_imp_long$Modelo <- "Modelo Variables Importantes"
+
+# Combinar datos de ambas matrices
+conf_mat_combined <- rbind(conf_mat_general_long, conf_mat_vars_imp_long)
+
+# Calcular porcentajes dentro de cada matriz
+conf_mat_combined <- conf_mat_combined %>%
+  group_by(Modelo) %>%
+  mutate(Total = sum(Count),
+         Percentage = Count / Total * 100)
+
+# Crear gráficos de heatmap para matrices de confusión
+ggplot(conf_mat_combined, aes(x = Actual, y = Predicted, fill = Count)) +
+  geom_tile() +
+  facet_wrap(~Modelo) +
+  geom_text(aes(label = paste0(Count, "\n(", round(Percentage, 1), "%)"))) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(title = "Comparación de Matrices de Confusión",
+       x = "Clase Real",
+       y = "Clase Predicha") +
+  theme_minimal()
+```
+
+
+##2.20 Prediccion con el Test Set Elastic Net
 ```{r}
 #Prediccion el Test Set
 predictTest_EN <- test_factors %>%
@@ -734,7 +1162,7 @@ prediccion_test_EN <- data.frame(
 print(prediccion_test_EN)
 ```
 
-##2.14 Gráficos de la predicción
+##2.21 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_EN$prob_probre_EN, 
@@ -766,9 +1194,11 @@ text(x = 1:length(prop_clases_EN),
 
 ```
 
-##2.15 Template Elastic Net
+##2.22 Template Elastic Net
 ```{r}
-write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
+write.csv(resultados_prediccion_EN, "../05_Predictions/09042025_sample_equipo4_EN.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 
@@ -783,12 +1213,15 @@ mod_1_logit<- glm(Pobre~.,
                  weights = wts_import) # Inclusion de penderacion de clases
 
 ```
+
 ##3.2 Resultados Estimadores Logit 
+
 ```{r}
 summary(mod_1_logit,type="text")
 ```
 
 ##3.3 Probabilidad Logit
+
 ```{r}
 #Calculo de probabilidades
 prob_logit<- train_importantes %>% 
@@ -796,16 +1229,17 @@ prob_logit<- train_importantes %>%
                           newdata = train_importantes, 
                           type = "response"))
 
-
 ```
 
 ## 3.4 Resultado Probabilidad Logit
+
 ```{r}
 head(prob_logit %>% 
        select(Pobre,prob_hat))
 ```
 
 ## 3.5 Clasificador Logit
+
 ```{r}
 
 umbral # Bayes Rule #Ver variable Umbral
@@ -819,6 +1253,7 @@ head(prob_logit %>%
 ```
 
 ##3.6.1 Matriz de confusion
+
 ```{r}
 # Convertir la variable Pred_pobre a factor con etiquetas descriptivas
 prob_logit$pred_pobre_factor <- factor(prob_logit$pred_pobre,
@@ -857,6 +1292,7 @@ print(counts_table_train)
 ```
 
 ##3.6.2 Metricas Modelo Logit
+
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -905,6 +1341,7 @@ print(metrics_table_mod_1_log)
 ```
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
+
 ```{r}
 ctrl_logit<- trainControl(method = "cv",
                     number = 5,
@@ -915,6 +1352,7 @@ ctrl_logit<- trainControl(method = "cv",
 ```
 
 ##3.8 Entrenamiento modelo 2
+
 ```{r}
 #Entrenamiento del modelos Logit 
 #Tiempo de ejecucion 35 seg
@@ -938,6 +1376,7 @@ head(mod_2_logit$pred)
 ```
 
 ##3.9 Matriz de confusion modelo 2
+
 ```{r}
 # Obtener predicciones en los datos de entrenamiento
 predicciones_train_cv <- predict(mod_2_logit, 
@@ -951,7 +1390,9 @@ predicciones_umbral <- factor(ifelse(predicciones_train_cv[,"Yes"] > umbral,
                              levels = levels(train_factors$Pobre))
 
 ```
+
 ##3.10 Crear la curva ROC para prediccion train set Logit
+
 ```{r}
 # Crear objeto ROC
 roc_obj_logit <- roc(response = train_factors$Pobre, 
@@ -1002,6 +1443,7 @@ ggplot() +
 ```
 
 ##3.11 Matriz de Confusion Logit
+
 ```{r}
 # Matriz de confusión del modelo con validación cruzada
 B_cv <- confusionMatrix(predicciones_umbral, train_importantes$Pobre)
@@ -1031,8 +1473,8 @@ print(counts_table_cv)
 
 ```
 
-
 ##3.12 Metricas Modelo de Entrenamieno Logit 
+
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -1080,6 +1522,7 @@ print(metrics_table_mod_2_log)
 ```
 
 ##3.13 Explorar la importancia de las variables
+
 ```{r}
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
@@ -1088,6 +1531,7 @@ plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
 ##3.14 Comparacion entre los modelos 1 y 2
+
 ```{r}
 #Crear un dataframe con los dos modelos y verlos en paralelo
 comparar_df <- data.frame(
@@ -1114,6 +1558,7 @@ print(comparar_df)
 ```
 
 ##3.15 Predición con el Test Set/Clasificacion 
+
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
@@ -1154,6 +1599,7 @@ print(prediccion_test_logit)
 ```
 
 ##3.16 Gráficos de la predicción
+
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_logit$prob_pobre_logit, 
@@ -1183,7 +1629,6 @@ text(x = 1:length(prop_clases),
      cex = 0.8)
 
 ```
-
 
 ##3.17 Comparacion entre entrenamiento y prediccion
 
@@ -1216,10 +1661,12 @@ comparacion_mod_log <- data.frame(
 print(comparacion_mod_log)
 ```
 
-
 ##3.18 Template_Logit
+
 ```{r}
-write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/08042025sample_equipo4_Logit.csv", row.names = FALSE)
+write.csv(resultados_prediccion_logit, "../05_Predictions/08042025sample_equipo4_Logit.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
 ```
 
 
@@ -1290,11 +1737,14 @@ resultados_prediccion_rf <- predictTest_rf %>%
   select(id, pobre)
 
 ```
+
 ## 4.4 Template_RF
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf, "../05_Predictions/080425sample_equipo4_rf.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 ## 4.5 Ver importancia de variables RF
@@ -1313,6 +1763,7 @@ randomForest::varImpPlot(randomforest, main = "Importancia de Variables (Random 
 dev.off()
 
 ```
+
 ## 4.6 Entrenamiento fuera de muestra cross validation con ranger
 
 ```{r}
@@ -1344,7 +1795,6 @@ mtry_grid <- expand.grid(
 
 ```
 
-
 ## 4.7 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
 
 ```{r}
@@ -1366,6 +1816,7 @@ cv_rf <- train(
 
 
 ```
+
 ## 4.8 Predicciones RF con libreria ranger + cv
 
 ```{r}
@@ -1392,10 +1843,13 @@ resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf_cv.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf_cv, "../05_Predictions/080425sample_equipo4_rf_cv.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 ## 4.10 Ver importancia de variables
+
 ```{r}
 # Crear gráfico de importancia de variables
 varimp_plot <- plot(varImp(cv_rf), top = 10)
@@ -1409,7 +1863,9 @@ dev.off()
 plot(varImp(cv_rf), top = 10)
 
 ```
+
 ## 4.11 Comparar AUC de ambos modelos
+
 ```{r}
 # AUC para modelo RandomForest sin CV
 aucval_rf <- Metrics::auc(
@@ -1431,10 +1887,9 @@ print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
 
 ```
 
+# 5. Naive Bayes
 
-##7. Naive Bayes
-
-##7.1. Detección variables varianza cero
+## 5.1 Detección variables varianza cero
 
 ```{r}
 p_load(caret)
@@ -1452,7 +1907,7 @@ test_nb <- test_factors[, !(names(test_factors) %in% vars_quitar)]
 
 ```
 
-##7.2. Grilla Naive Bayes
+## 5.2 Grilla Naive Bayes
 
 ```{r}
 p_load(naivebayes, caret)
@@ -1466,7 +1921,8 @@ grid_nb <- expand.grid(
 
 ```
 
-##7.3. Entrenamiento CV
+## 5.3 Entrenamiento CV
+
 ```{r}
 # Control de entrenamiento con validación cruzada
 ctrl_nb <- trainControl(
@@ -1495,7 +1951,8 @@ nb_model
 
 ```
 
-##7.4. 
+## 5.4 Predicciones 
+
 ```{r}
 # Obtener probabilidades sobre el test set
 pred_prob_nb <- predict(nb_model, newdata = test_nb, type = "prob")
@@ -1510,18 +1967,20 @@ predicciones_kaggle_nb <- data.frame(id = test$id, Pobre = pred_clase_nb)
 table(predicciones_kaggle_nb$Pobre)
 ```
 
-##7.5.Template Naive Bayes
+## 5.5 Template Naive Bayes
+
 ```{r}
 ## Template_RF
-write.csv(predicciones_kaggle_nb, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/05_Predictions/sample_equipo4_naivebayes.csv", row.names = FALSE)
+write.csv(predicciones_kaggle_nb, "../05_Predictions/sample_equipo4_naivebayes.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 
-##5. Entrenamiento Boosting
+#6. Boosting / XGBoost
 
-##5.1. XGBoost
+##6.1 Definir Grilla XGBoost
 
-##5.1.1. Definir Grilla
 ```{r}
 p_load(xgboost)
 
@@ -1535,7 +1994,8 @@ grid_xgboost <- expand.grid(nrounds = c(250,500),
 grid_xgboost
 ```
 
-##5.1.2. Balanceo de pesos
+##6.2 Balanceo de pesos
+
 ```{r}
 
 # Calcular proporción de clases para asignar peso
@@ -1548,21 +2008,26 @@ weights <- ifelse(train_factors$Pobre == "Yes", weight_ratio, 1)
 ctrl <- trainControl(
   method = "cv",
   number = 5,
-  classProbs = TRUE,                   # Necesario para AUC
-  summaryFunction = twoClassSummary,  # Calcula ROC
+  classProbs = TRUE,                   
+  summaryFunction = twoClassSummary,  
   verboseIter = FALSE
 )
 
+```
+
+##6.3 Entrenamiento 
+
+```{r}
 # Entrenar el modelo XGBoost con fórmula directa
 set.seed(123)
 xgb_model <- train(
-  Pobre ~ .,                          # Variable objetivo
-  data = train_factors,               # Datos de entrenamiento
+  Pobre ~ .,                          
+  data = train_factors,               
   method = "xgbTree",
   trControl = ctrl,
   tuneGrid = grid_xgboost,
   metric = "ROC",     
-  weights = weights,                  # <--- este es el cambio importante
+  weights = weights,                  
   verbosity = 0
 )
 
@@ -1570,7 +2035,8 @@ print(xgb_model)
 
 ```
 
-##5.1.3. Probabilidades XGBoost
+##6.4 Probabilidades XGBoost
+
 ```{r}
 # Obtener probabilidades
 pred_prob_xgboost <- predict(xgb_model, newdata = test_factors, type = "prob")
@@ -1582,63 +2048,18 @@ table(resultados_prediccion_xgboost_2$Pobre)
 
 ```
 
-##5.1.4. Template XGBoosting
+##6.5 Template XGBoosting
+
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_xgboost_2, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost2.csv", row.names = FALSE)
+write.csv(resultados_prediccion_xgboost_2,
+          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
+          quote = FALSE)
 ```
 
-#5.2. Gradient Boosting
+# 7. Entrenamiento algoritmo CART
 
-```{r}
-p_load(gbm)
-
-
-grid_gbm <- expand.grid(
-  n.trees = c(100, 200, 300),
-  interaction.depth = c(3, 4),
-  shrinkage = c(0.1),
-  n.minobsinnode = c(5, 10)
-)
-```
-
-```{r}
-# Definir control de entrenamiento específico para gbm
-ctrl_gbm <- trainControl(
-  method = "cv",
-  number = 5,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary
-)
-
-set.seed(123) # important set seed. 
-gbm_tree <- train(Pobre ~ .,
-  data = train_factors, 
-  method = "gbm", 
-  trControl = ctrl_gbm,
-  tuneGrid=grid_gbm,
-  metric = "ROC",
-  verbose = FALSE
-)            
-gbm_tree
-```
-
-```{r}
-pred_prob_gbm <- predict(gbm_tree, newdata = test_factors, type = "prob")
-pred_clase_gbm <- ifelse(pred_prob_gbm[,"Yes"] > 0.5, 1, 0)
-predicciones_kaggle_gbm <- data.frame(id = test$id, Pobre = pred_clase_gbm)
-table(predicciones_kaggle_gbm$Pobre)
-```
-
-```{r}
-setwd("C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning")
-# Exportar a CSV sin row.names
-write.csv(predicciones_kaggle_gbm, "kaggle_submission_gbm.csv", row.names = FALSE)
-```
-
-# 6. Entrenamiento algoritmo CART
-
-## 6.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
+## 7.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
 
 ```{r}
 # Ver importancia de variables
@@ -1663,7 +2084,7 @@ arbol$control$cp # alpha
 prp(arbol, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
 ```
 
-## 6.2 Predicción
+## 7.2 Predicción
 
 ```{r}
 # variables categóricas del test tengan los mismos niveles y tipos
@@ -1694,11 +2115,211 @@ submission <- data.frame(id = ids, Pobre = pred_clase)
 str(submission)
 ```
 
-##3.2 Template_CART
+##7.2 Template_CART
 
 ```{r}
 write.csv
-write.csv(submission, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/06-04-25_equipo4_cart.csv", 
+write.csv(submission, 
+          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
+          quote = FALSE)
+```
+
+# 8. Entrenamiento algoritmo de Regresión Lineal
+
+## 8.1 Entrenamiento del modelo con CV y 5 folds
+
+```{r}
+set.seed(122)
+# Control de entrenamiento sin classProbs, porque no es clasificación
+ctrl_lm <- trainControl(method = "cv", number = 5)
+
+# Entrenar modelo de regresión lineal
+modelo_lm <- train(
+  Pobre ~ ., 
+  data = train, 
+  method = "lm", 
+  trControl = ctrl_lm
+)
+
+```
+
+## 8.3 Predicción con valores continuos train
+
+```{r}
+# Predicciones 
+pred_lm_train <- predict(modelo_lm, newdata = train)
+
+# Convertir a clase usando umbral 0.5
+pred_class_train_lm <- ifelse(pred_lm_train >= 0.5, 1, 0)
+
+```
+
+## 8.4 Matriz de confusión para regresión lineal
+
+```{r}
+# Matriz de confusión
+confusionMatrix(factor(pred_class_train_lm), factor(train$Pobre))
+
+# Calcular métrica F1
+F1_Score(y_pred = pred_class_train_lm, y_true = train$Pobre, positive = "1")
+
+```
+
+## 8.5 Predicción
+
+```{r}
+# Predicción
+pred_test_lm <- predict(modelo_lm, newdata = test)
+
+# Clasificar con umbral 0.5
+pred_binaria_test_lm <- ifelse(pred_test_lm >= 0.5, 1, 0)
+
+```
+
+## 8.6 Template regresión lineal
+
+```{r}
+# Crear archivo para submission
+submission_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_lm)
+
+# 10. Exportar
+write.csv(submission_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal.csv", 
           row.names = FALSE, 
           quote = FALSE)
 ```
+
+## 8.7 Selección de variables importantes
+
+```{r}
+# Importancia de las variables
+importance_lm <- varImp(modelo_lm, scale = TRUE)
+print(importance_lm)
+
+importance_df_lm <- importance_lm$importance
+importance_df_lm$Variable <- rownames(importance_df_lm)
+
+# Seleccionar top 8
+top_vars <- importance_df_lm[order(-importance_df_lm$Overall), ][1:8, ]
+
+# Crear gráfico con ggplot2
+graf_import_lm <- ggplot(top_vars, aes(x = reorder(Variable, Overall), y = Overall)) +
+  geom_bar(stat = "identity", fill = "gray") +
+  coord_flip() +
+  labs(
+    title = "Importancia de las variables - Modelo Regresión Lineal",
+    x = "Variables",
+    y = "Importancia escalada"
+  ) +
+  theme_bw()
+
+# Guardar
+ggsave("../04_Views/GRÁFICO-IMPORTANCIA DE VARIABLES REGRESIÓN LINEAL.png",
+       plot = graf_import_lm, width = 10, height = 6, dpi = 300)
+
+# Extraer nombres de las 8 variables más importantes
+top_vars <- rownames(importance_lm$importance)[order(importance_lm$importance$Overall, decreasing = TRUE)][1:8]
+print(top_vars)
+
+# Obtener nombres de las 8 variables más importantes
+vars_top <- rownames(importance_lm$importance)[order(importance_lm$importance$Overall, decreasing = TRUE)][1:8]
+
+# Crear fórmula con solo esas variables
+formula_top_ml <- as.formula(paste("Pobre ~", paste(vars_top, collapse = " + ")))
+```
+
+## 8.8 Entramiento del modelo con variables más importantes
+
+```{r}
+# Volver a entrenar modelo con variables seleccionadas
+modelo_lm_top <- train(
+  formula_top_ml,
+  data = train,
+  method = "lm",
+  trControl = ctrl_lm
+)
+
+# Predicciones en train
+pred_train_top_lm <- predict(modelo_lm_top, newdata = train)
+pred_class_top_lm <- ifelse(pred_train_top_lm >= 0.5, 1, 0)
+```
+
+## 8.9 Nueva matriz de confusión y métrica
+
+```{r}
+# Matriz de confusión
+confusionMatrix(factor(pred_class_top_lm), factor(train$Pobre))
+
+# F1
+F1_Score(y_pred = pred_class_top_lm, y_true = train$Pobre, positive = "1")
+```
+## 8.10 Predicción
+
+```{r}
+# Predicciones en test
+pred_test_top_ml <- predict(modelo_lm_top, newdata = test)
+pred_binaria_test_top_ml <- ifelse(pred_test_top_ml >= 0.5, 1, 0)
+```
+
+## 8.11 Template regresión lineal variales top
+
+```{r}
+# Crear nuevo archivo
+submission_top_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_top_ml)
+
+# Exportar
+write.csv(submission_top_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal_TOP.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
+```
+
+## 8.12 Modelo con interacción de las 8 variables top
+
+```{r}
+set.seed(122)
+# 1. Control de entrenamiento (sin classProbs porque es regresión)
+ctrl_lm_interac <- trainControl(method = "cv", number = 5)
+
+# 2. Crear fórmula con interacciones de segundo orden
+formula_interactiva <- as.formula(paste("Pobre ~ (", paste(top_vars, collapse = " + "), ")^2"))
+
+# 3. Entrenamiento del modelo lineal con interacciones
+modelo_interac <- train(
+  formula_interactiva,
+  data = train,
+  method = "lm",
+  trControl = ctrl_lm_interac
+)
+
+# 4. Predicciones en entrenamiento
+pred_train <- predict(modelo_interac, newdata = train)
+
+# 5. Convertir predicciones a clases usando umbral 
+umbral <- 0.3
+pred_clase <- ifelse(pred_train >= umbral, "Pobre", "NoPobre")
+
+# 6. Convertir a factor para comparar
+pred_clase <- factor(pred_clase, levels = c("Pobre", "NoPobre"))
+actual_clase <- factor(ifelse(train$Pobre == 1, "Pobre", "NoPobre"), levels = c("Pobre", "NoPobre"))
+
+# 7. Matriz de confusión
+confusionMatrix(pred_clase, actual_clase)
+
+# 8. F1 Score
+F1_Score(y_pred = pred_clase, y_true = actual_clase, positive = "Pobre")
+
+# 9. Predicciones en test
+pred_test_interac_ml <- predict(modelo_interac, newdata = test)
+pred_binaria_test_interac_ml <- ifelse(pred_test_interac_ml >= 0.5, 1, 0)
+
+# 10. Crear nuevo archivo
+submission_inteac_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_interac_ml)
+
+# Exportar
+write.csv(submission_inteac_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal_interac.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
+```
+
