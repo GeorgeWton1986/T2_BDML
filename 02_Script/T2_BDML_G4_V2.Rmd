@@ -682,15 +682,53 @@ ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
 ```
 
 
+##2.13 Crear una funcion para el optimizar el F1 Scores
+```{r}
+f1_summary <- function(data, lev = NULL, model = NULL) {
+  # Asegurarse que los niveles estén correctamente identificados
+  if(is.null(lev)) lev <- levels(data$obs)
+  
+  # Identificar la clase positiva (asumimos que es la segunda, "Yes")
+  positive_class <- lev[2]
+  
+  # Extraer las probabilidades de la clase positiva
+  probs <- data[, positive_class]
+  
+  # Convertir a predicciones binarias usando umbral
+  pred_class <- factor(ifelse(probs >= 0.3, positive_class, lev[1]), levels = lev)
+  
+  # Calcular precisión (precision)
+  precision <- sum(pred_class == positive_class & data$obs == positive_class) / 
+               sum(pred_class == positive_class)
+  
+  # Calcular exhaustividad (recall)
+  recall <- sum(pred_class == positive_class & data$obs == positive_class) / 
+            sum(data$obs == positive_class)
+  
+  # Calcular F1
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  # En caso de NaN (por ejemplo, si precision y recall son 0)
+  if(is.nan(f1)) f1 <- 0
+  
+  # Devolver un vector nombrado con F1
+  result <- c(F1 = f1)
+  names(result) <- "F1"
+  
+  return(result)
+}
+```
+
+
 ##2.13 Entrenar el modelo Elastic Net con Caret variables importantes
 ```{r}
 #Tiempo de ejecucion 15 minutos
 #Configacion de la validacion Cruzada
 ctrl_EN_import <- trainControl(method = "cv",
-                    number = 10,
+                    number = 5,
                     classProbs = TRUE,
                     savePredictions = TRUE, 
-                    summaryFunction = twoClassSummary
+                    summaryFunction = f1_summary
                     )
 
 #Definir la grilla de los hiperparametros alfa y lambda
@@ -698,13 +736,8 @@ ctrl_EN_import <- trainControl(method = "cv",
 # El hipeparametro lambda controla la intensidad de la regularización
 
 grilla_EN_import <- expand.grid(
-  alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
+  alpha= seq(0, 1, by = 0.2),
   lambda= 10^seq(-4, -1, length = 10)) #Logaritmos
-
-# grilla_EN_import <- expand.grid(
-#   alpha = seq(0, 1, by = 0.1),
-#   lambda = 10^seq(-6, 1, length = 20) #Logaritmos
-# )
 
 # Entrenar un nuevo modelo con el dataset reducido
 set.seed(123)
@@ -715,7 +748,7 @@ mod_1_EN<- train(
   weights = wts_import, #Muestra rebalanceada
   trControl = ctrl_EN_import,
   tuneGrid = grilla_EN_import,
-  metric = "ROC",
+  metric = "F1",
   preProcess = c("center", "scale","zv"))
 
 ```
@@ -1115,7 +1148,7 @@ text(x = 1:length(prop_clases_EN),
 
 ##2.22 Template Elastic Net
 ```{r}
-write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/03042025_sample_equipo4_EN.csv", row.names = FALSE)
+write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/09042025_sample_equipo4_EN.csv", row.names = FALSE)
 ```
 
 
