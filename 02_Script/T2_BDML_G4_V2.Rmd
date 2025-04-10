@@ -321,23 +321,28 @@ test_factors<- test %>%
 tabla_pobreza <- table(train_factors$Pobre)
 prop_clases_pobreza <- prop.table(tabla_pobreza)
 
+
+# Abrir el dispositivo gráfico PNG
+png("../04_Views/GRÁFICO1-PROPORCIÓN DE CLASES DE POBREZA EN DATOS DE ENTRENAMIENTO.png", 
+    width = 800, height = 600, res = 150)
+
 # Visualizar proporción de clases en un gráfico de barras
-barplot(prop_clases_pobreza,
-        main = "Proporción de clases de pobreza en datos de entrenamiento",
-        xlab = "Condición de pobreza",
-        ylab = "Proporción",
-        col = c("lightgreen", "coral"),
-        names.arg = c("No pobre", "Pobre"),
-        ylim = c(0, 1))
+bp1 <- barplot(prop_clases_pobreza,
+               main = "Proporción de clases de pobreza en datos de entrenamiento",
+               xlab = "Condición de pobreza",
+               ylab = "Proporción",
+               col = c("lightgreen", "coral"),
+               names.arg = c("No pobre", "Pobre"),
+               ylim = c(0, 1))
 
 # Agregar etiquetas de porcentaje
-text(x = 1:length(prop_clases_pobreza), 
+text(x = bp1, 
      y = prop_clases_pobreza + 0.05,
      labels = paste0(round(prop_clases_pobreza * 100, 1), "%"),
      cex = 0.8)
 
-# Guardar  
-ggsave("GRÁFICO1-PROPORCIÓN DE CLASES DE PROBREZA EN DATOS DE ENTRENAMIENTO.png", dpi = 300)
+# Cerrar el dispositivo gráfico
+dev.off()
 ```
 
 ##1.9 Rebalanceo de la muestra train
@@ -379,8 +384,11 @@ ggplot(datos_plot, aes(x = Clase, y = Proporcion, fill = Tipo)) +
        x = "Condición de pobreza",
        y = "Proporción") +
   scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
-  theme_minimal() +
+  theme_bw() +
   ylim(0, 1)
+
+# Guardar el gráfico con una ruta relativa a la carpeta
+ggsave("../04_Views/GRAFICO2-PROPORCION_DE_CLASES.png", dpi = 300)
 ```
 
 #2. Entrenamiento Modelo Elastic Net
