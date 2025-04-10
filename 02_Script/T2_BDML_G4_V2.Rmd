@@ -476,7 +476,7 @@ print(paste("Mejor F1 Score:", round(mejor_f1, 4),
             "con umbral:", round(umbral_optimo, 4)))
 
 # Visualización de Precisión, Recall y F1 para diferentes umbrales
-ggplot(prec_recall, aes(x = threshold)) +
+graf_metricas_EN_Gen <- ggplot(prec_recall, aes(x = threshold)) +
   geom_line(aes(y = precision, color = "Precisión")) +
   geom_line(aes(y = recall, color = "Recall")) +
   geom_line(aes(y = f1_score, color = "F1 Score")) +
@@ -485,7 +485,10 @@ ggplot(prec_recall, aes(x = threshold)) +
        x = "Umbral",
        y = "Valor",
        color = "Métrica") +
-  theme_minimal()
+  theme_bw()
+
+# Guardar gráfico
+ggsave("../04_Views/GRAFICO3-MÉTRICAS_vs_UMBRAL_DECISION.png", plot = graf_metricas_EN_Gen, dpi = 300, width = 8, height = 6)
 
 # Usar el umbral óptimo para las predicciones
 umbral_gral <- umbral_optimo  # Usar el umbral optimizado
@@ -523,7 +526,7 @@ punto_umbral_gral <- data.frame(
 )
 
 # Crear gráfico con ggplot2
-ggplot() +
+graf_roc_EN_gen <- ggplot() +
   geom_line(data = roc_data_gral, aes(x = Especificidad, y = Sensibilidad), 
             color = "blue", size = 1) +
   geom_point(data = punto_umbral_gral, aes(x = Especificidad, y = Sensibilidad), 
@@ -544,6 +547,10 @@ ggplot() +
   annotate("text", x = 0.75, y = 0.25, 
            label = paste("AUC =", round(auc_value_gral, 4)), 
            color = "blue", size = 5)
+
+# Guardar
+ggsave("../04_Views/GRAFICO4-CURVA_ROC_ELASTIC_NET.png", 
+       plot = graf_roc_EN_gen, dpi = 300, width = 8, height = 6)
 
 ```
 
@@ -614,7 +621,22 @@ imp_df <- imp_df[order(imp_df$Importancia, decreasing = TRUE),]
 print(head(imp_df, 20))
 
 # Graficar las 15 variables más importantes
-plot(importancia, top = 15)
+top15 <- head(imp_df, 15)
+
+# Crear gráfico con ggplot
+grafico_imp_en <- ggplot(top15, aes(x = reorder(Variable, Importancia), y = Importancia)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  coord_flip() +
+  labs(title = "Importancia de Variables - Modelo Elastic Net",
+       x = "Variables", y = "Importancia escalada") +
+  theme_bw()
+
+# Guardar como imagen PNG
+ggsave("../04_Views/GRÁFICO5-IMPORTANCIA-VAR-ELASTIC-NET.png", 
+       plot = grafico_imp_en, width = 8, height = 6)
+
+
+#plot(importancia, top = 15)
 
 ```
 
@@ -637,6 +659,9 @@ train_importantes <- train_factors[, names(train_factors) %in% variables_importa
 tabla_pobreza_import <- table(train_importantes$Pobre)
 prop_clases_pobreza_import <- prop.table(tabla_pobreza_import)
 
+# Abrir el dispositivo gráfico
+png("../04_Views/GRÁFICO5-PROPORCIÓN DE CLASES DE POBRAZA IMPORTANTES EN ENTRENAMIENTO.png", width = 800, height = 600, res = 150)
+
 # Visualizar proporción de clases en un gráfico de barras
 barplot(prop_clases_pobreza_import,
         main = "Proporción de clases de pobreza en datos de entrenamiento",
@@ -651,6 +676,9 @@ text(x = 1:length(prop_clases_pobreza_import),
      y = prop_clases_pobreza_import + 0.05,
      labels = paste0(round(prop_clases_pobreza_import * 100, 1), "%"),
      cex = 0.8)
+
+# Cerrar el dispositivo gráfico
+dev.off()
 
 # Calcular ponderadores
 n_no_pobre_import <- sum(train_importantes$Pobre == "No")
@@ -675,7 +703,7 @@ datos_plot_import <- data.frame(
 )
 
 # Crear gráfico de barras agrupadas
-ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
+graf_comp_clases <- ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
   geom_text(aes(label = paste0(round(Proporcion * 100, 1), "%")), 
             position = position_dodge(width = 0.9),
@@ -686,6 +714,10 @@ ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fill = Tipo)) +
   scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
   theme_minimal() +
   ylim(0, 1)
+
+# Guardar 
+ggsave("../04_Views/GRAFICO-PROPORCION-CLASES-ORIGINAL-VS-PONDERADA.png", 
+       plot = graf_comp_clases, width = 8, height = 6)
 
 ```
 
@@ -1156,7 +1188,9 @@ text(x = 1:length(prop_clases_EN),
 
 ##2.22 Template Elastic Net
 ```{r}
-write.csv(resultados_prediccion_EN, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/09042025_sample_equipo4_EN.csv", row.names = FALSE)
+write.csv(resultados_prediccion_EN, "../05_Predictions/09042025_sample_equipo4_EN.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 
@@ -1171,12 +1205,15 @@ mod_1_logit<- glm(Pobre~.,
                  weights = wts_import) # Inclusion de penderacion de clases
 
 ```
+
 ##3.2 Resultados Estimadores Logit 
+
 ```{r}
 summary(mod_1_logit,type="text")
 ```
 
 ##3.3 Probabilidad Logit
+
 ```{r}
 #Calculo de probabilidades
 prob_logit<- train_importantes %>% 
@@ -1184,16 +1221,17 @@ prob_logit<- train_importantes %>%
                           newdata = train_importantes, 
                           type = "response"))
 
-
 ```
 
 ## 3.4 Resultado Probabilidad Logit
+
 ```{r}
 head(prob_logit %>% 
        select(Pobre,prob_hat))
 ```
 
 ## 3.5 Clasificador Logit
+
 ```{r}
 
 umbral # Bayes Rule #Ver variable Umbral
@@ -1207,6 +1245,7 @@ head(prob_logit %>%
 ```
 
 ##3.6.1 Matriz de confusion
+
 ```{r}
 # Convertir la variable Pred_pobre a factor con etiquetas descriptivas
 prob_logit$pred_pobre_factor <- factor(prob_logit$pred_pobre,
@@ -1245,6 +1284,7 @@ print(counts_table_train)
 ```
 
 ##3.6.2 Metricas Modelo Logit
+
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -1293,6 +1333,7 @@ print(metrics_table_mod_1_log)
 ```
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
+
 ```{r}
 ctrl_logit<- trainControl(method = "cv",
                     number = 5,
@@ -1303,6 +1344,7 @@ ctrl_logit<- trainControl(method = "cv",
 ```
 
 ##3.8 Entrenamiento modelo 2
+
 ```{r}
 #Entrenamiento del modelos Logit 
 #Tiempo de ejecucion 35 seg
@@ -1326,6 +1368,7 @@ head(mod_2_logit$pred)
 ```
 
 ##3.9 Matriz de confusion modelo 2
+
 ```{r}
 # Obtener predicciones en los datos de entrenamiento
 predicciones_train_cv <- predict(mod_2_logit, 
@@ -1339,7 +1382,9 @@ predicciones_umbral <- factor(ifelse(predicciones_train_cv[,"Yes"] > umbral,
                              levels = levels(train_factors$Pobre))
 
 ```
+
 ##3.10 Crear la curva ROC para prediccion train set Logit
+
 ```{r}
 # Crear objeto ROC
 roc_obj_logit <- roc(response = train_factors$Pobre, 
@@ -1390,6 +1435,7 @@ ggplot() +
 ```
 
 ##3.11 Matriz de Confusion Logit
+
 ```{r}
 # Matriz de confusión del modelo con validación cruzada
 B_cv <- confusionMatrix(predicciones_umbral, train_importantes$Pobre)
@@ -1419,8 +1465,8 @@ print(counts_table_cv)
 
 ```
 
-
 ##3.12 Metricas Modelo de Entrenamieno Logit 
+
 ```{r}
 #Métricas derivadas:
 # Exactitud (Accuracy): (TP + TN) / (TP + TN + FP + FN)
@@ -1468,6 +1514,7 @@ print(metrics_table_mod_2_log)
 ```
 
 ##3.13 Explorar la importancia de las variables
+
 ```{r}
 # Importancia de variables
 importancia <- varImp(mod_2_logit, scale = TRUE)
@@ -1476,6 +1523,7 @@ plot(importancia, top = 20, main = "Las variables más importantes")
 ```
 
 ##3.14 Comparacion entre los modelos 1 y 2
+
 ```{r}
 #Crear un dataframe con los dos modelos y verlos en paralelo
 comparar_df <- data.frame(
@@ -1502,6 +1550,7 @@ print(comparar_df)
 ```
 
 ##3.15 Predición con el Test Set/Clasificacion 
+
 ```{r}
 #Prediccion el Test Set
 predictTest_logit <- test_factors %>% 
@@ -1542,6 +1591,7 @@ print(prediccion_test_logit)
 ```
 
 ##3.16 Gráficos de la predicción
+
 ```{r}
 # Distribucion de probabilidades predichas
 hist(predictTest_logit$prob_pobre_logit, 
@@ -1571,7 +1621,6 @@ text(x = 1:length(prop_clases),
      cex = 0.8)
 
 ```
-
 
 ##3.17 Comparacion entre entrenamiento y prediccion
 
@@ -1604,10 +1653,12 @@ comparacion_mod_log <- data.frame(
 print(comparacion_mod_log)
 ```
 
-
 ##3.18 Template_Logit
+
 ```{r}
-write.csv(resultados_prediccion_logit, "/Users/jorgeviafara/Library/CloudStorage/OneDrive-Personal/MAESTRIA EN ECONOMIA/01 MATERIAS MECA/4107 BIG DATA/T2_BDML_personal/08042025sample_equipo4_Logit.csv", row.names = FALSE)
+write.csv(resultados_prediccion_logit, "../05_Predictions/08042025sample_equipo4_Logit.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
 ```
 
 
@@ -1678,11 +1729,14 @@ resultados_prediccion_rf <- predictTest_rf %>%
   select(id, pobre)
 
 ```
+
 ## 4.4 Template_RF
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf, "../05_Predictions/080425sample_equipo4_rf.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 ## 4.5 Ver importancia de variables RF
@@ -1701,6 +1755,7 @@ randomForest::varImpPlot(randomforest, main = "Importancia de Variables (Random 
 dev.off()
 
 ```
+
 ## 4.6 Entrenamiento fuera de muestra cross validation con ranger
 
 ```{r}
@@ -1732,7 +1787,6 @@ mtry_grid <- expand.grid(
 
 ```
 
-
 ## 4.7 Entrenamiento del modelo para buscar la mejor combinación de parámetros, se usa ranger con cross validation
 
 ```{r}
@@ -1754,6 +1808,7 @@ cv_rf <- train(
 
 
 ```
+
 ## 4.8 Predicciones RF con libreria ranger + cv
 
 ```{r}
@@ -1780,10 +1835,13 @@ resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/Predictions/080425sample_equipo4_rf_cv.csv", row.names = FALSE)
+write.csv(resultados_prediccion_rf_cv, "../05_Predictions/080425sample_equipo4_rf_cv.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 ## 4.10 Ver importancia de variables
+
 ```{r}
 # Crear gráfico de importancia de variables
 varimp_plot <- plot(varImp(cv_rf), top = 10)
@@ -1797,7 +1855,9 @@ dev.off()
 plot(varImp(cv_rf), top = 10)
 
 ```
+
 ## 4.11 Comparar AUC de ambos modelos
+
 ```{r}
 # AUC para modelo RandomForest sin CV
 aucval_rf <- Metrics::auc(
@@ -1818,7 +1878,6 @@ print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
 
 
 ```
-
 
 # 5. Naive Bayes
 
@@ -1855,6 +1914,7 @@ grid_nb <- expand.grid(
 ```
 
 ## 5.3 Entrenamiento CV
+
 ```{r}
 # Control de entrenamiento con validación cruzada
 ctrl_nb <- trainControl(
@@ -1883,7 +1943,8 @@ nb_model
 
 ```
 
-## 5.4 Predicciones  
+## 5.4 Predicciones 
+
 ```{r}
 # Obtener probabilidades sobre el test set
 pred_prob_nb <- predict(nb_model, newdata = test_nb, type = "prob")
@@ -1899,15 +1960,19 @@ table(predicciones_kaggle_nb$Pobre)
 ```
 
 ## 5.5 Template Naive Bayes
+
 ```{r}
 ## Template_RF
-write.csv(predicciones_kaggle_nb, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/05_Predictions/sample_equipo4_naivebayes.csv", row.names = FALSE)
+write.csv(predicciones_kaggle_nb, "../05_Predictions/sample_equipo4_naivebayes.csv", 
+          row.names = FALSE,
+          quote = FALSE)
 ```
 
 
 #6. Boosting / XGBoost
 
 ##6.1 Definir Grilla XGBoost
+
 ```{r}
 p_load(xgboost)
 
@@ -1922,6 +1987,7 @@ grid_xgboost
 ```
 
 ##6.2 Balanceo de pesos
+
 ```{r}
 
 # Calcular proporción de clases para asignar peso
@@ -1942,6 +2008,7 @@ ctrl <- trainControl(
 ```
 
 ##6.3 Entrenamiento 
+
 ```{r}
 # Entrenar el modelo XGBoost con fórmula directa
 set.seed(123)
@@ -1960,8 +2027,8 @@ print(xgb_model)
 
 ```
 
-
 ##6.4 Probabilidades XGBoost
+
 ```{r}
 # Obtener probabilidades
 pred_prob_xgboost <- predict(xgb_model, newdata = test_factors, type = "prob")
@@ -1974,6 +2041,7 @@ table(resultados_prediccion_xgboost_2$Pobre)
 ```
 
 ##6.5 Template XGBoosting
+
 ```{r}
 ## Template_RF
 write.csv(resultados_prediccion_xgboost_2,
