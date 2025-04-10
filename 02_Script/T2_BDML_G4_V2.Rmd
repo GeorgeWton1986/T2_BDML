@@ -652,7 +652,7 @@ barplot(prop_clases_pobreza_import,
 
 # Agregar etiquetas de porcentaje
 text(x = 1:length(prop_clases_pobreza_import), 
-     y = prop_clases_pobreza + 0.05,
+     y = prop_clases_pobreza_import + 0.05,
      labels = paste0(round(prop_clases_pobreza_import * 100, 1), "%"),
      cex = 0.8)
 
@@ -662,12 +662,12 @@ n_pobre_import <- sum(train_importantes$Pobre == "Yes")
 pos_weight_import <- n_no_pobre_import / n_pobre_import  # Peso para la clase minoritaria (Pobre)
 
 # Crear vector de pesos
-wts_import <- ifelse(train_importantes$Pobre == "Yes", pos_weight, 1)
+wts_import <- ifelse(train_importantes$Pobre == "Yes", pos_weight_import, 1)
 
 # Calcular distribución ponderada
 tabla_ponderada_import <- c(
-  sum(wts[train_importantes$Pobre == "No"]),  # Suma de pesos para "No pobre"
-  sum(wts[train_importantes$Pobre == "Yes"])  # Suma de pesos para "Pobre"
+  sum(wts_import[train_importantes$Pobre == "No"]),  # Suma de pesos para "No pobre"
+  sum(wts_import[train_importantes$Pobre == "Yes"])  # Suma de pesos para "Pobre"
 )
 prop_ponderada_import <- prop.table(tabla_ponderada_import)
 
@@ -710,9 +710,13 @@ ctrl_EN_import <- trainControl(method = "cv",
 # El hipeparametro lambda controla la intensidad de la regularización
 
 grilla_EN_import <- expand.grid(
-  alpha = seq(0, 1, by = 0.1),
-  lambda = 10^seq(-6, 1, length = 20) #Logaritmos
-)
+  alpha= c(0.1, 0.3, 0.5, 0.7, 0.9),
+  lambda= 10^seq(-4, -1, length = 10)) #Logaritmos
+
+# grilla_EN_import <- expand.grid(
+#   alpha = seq(0, 1, by = 0.1),
+#   lambda = 10^seq(-6, 1, length = 20) #Logaritmos
+# )
 
 # Entrenar un nuevo modelo con el dataset reducido
 set.seed(123)
