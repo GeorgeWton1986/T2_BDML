@@ -1976,7 +1976,9 @@ table(resultados_prediccion_xgboost_2$Pobre)
 ##6.5 Template XGBoosting
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_xgboost_2, "C:/Users/njaco/OneDrive/Documentos/Mestría en Economía Aplicada/Semestre 3/Big Data y Machine Learning/Repositorios/T2_BDML/Predictions/sample_equipo4_xgboost2.csv", row.names = FALSE)
+write.csv(resultados_prediccion_xgboost_2,
+          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
+          quote = FALSE)
 ```
 
 # 7. Entrenamiento algoritmo CART
@@ -2041,7 +2043,207 @@ str(submission)
 
 ```{r}
 write.csv
-write.csv(submission, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/06-04-25_equipo4_cart.csv", 
+write.csv(submission, 
+          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
+          quote = FALSE)
+```
+
+# 8. Entrenamiento algoritmo de Regresión Lineal
+
+## 8.1 Entrenamiento del modelo con CV y 5 folds
+
+```{r}
+set.seed(122)
+# Control de entrenamiento sin classProbs, porque no es clasificación
+ctrl_lm <- trainControl(method = "cv", number = 5)
+
+# Entrenar modelo de regresión lineal
+modelo_lm <- train(
+  Pobre ~ ., 
+  data = train, 
+  method = "lm", 
+  trControl = ctrl_lm
+)
+
+```
+
+## 8.3 Predicción con valores continuos train
+
+```{r}
+# Predicciones 
+pred_lm_train <- predict(modelo_lm, newdata = train)
+
+# Convertir a clase usando umbral 0.5
+pred_class_train_lm <- ifelse(pred_lm_train >= 0.5, 1, 0)
+
+```
+
+## 8.4 Matriz de confusión para regresión lineal
+
+```{r}
+# Matriz de confusión
+confusionMatrix(factor(pred_class_train_lm), factor(train$Pobre))
+
+# Calcular métrica F1
+F1_Score(y_pred = pred_class_train_lm, y_true = train$Pobre, positive = "1")
+
+```
+
+## 8.5 Predicción
+
+```{r}
+# Predicción
+pred_test_lm <- predict(modelo_lm, newdata = test)
+
+# Clasificar con umbral 0.5
+pred_binaria_test_lm <- ifelse(pred_test_lm >= 0.5, 1, 0)
+
+```
+
+## 8.6 Template regresión lineal
+
+```{r}
+# Crear archivo para submission
+submission_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_lm)
+
+# 10. Exportar
+write.csv(submission_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal.csv", 
           row.names = FALSE, 
           quote = FALSE)
 ```
+
+## 8.7 Selección de variables importantes
+
+```{r}
+# Importancia de las variables
+importance_lm <- varImp(modelo_lm, scale = TRUE)
+print(importance_lm)
+
+importance_df_lm <- importance_lm$importance
+importance_df_lm$Variable <- rownames(importance_df_lm)
+
+# Seleccionar top 8
+top_vars <- importance_df_lm[order(-importance_df_lm$Overall), ][1:8, ]
+
+# Crear gráfico con ggplot2
+graf_import_lm <- ggplot(top_vars, aes(x = reorder(Variable, Overall), y = Overall)) +
+  geom_bar(stat = "identity", fill = "gray") +
+  coord_flip() +
+  labs(
+    title = "Importancia de las variables - Modelo Regresión Lineal",
+    x = "Variables",
+    y = "Importancia escalada"
+  ) +
+  theme_bw()
+
+# Guardar
+ggsave("../04_Views/GRÁFICO-IMPORTANCIA DE VARIABLES REGRESIÓN LINEAL.png",
+       plot = graf_import_lm, width = 10, height = 6, dpi = 300)
+
+# Extraer nombres de las 8 variables más importantes
+top_vars <- rownames(importance_lm$importance)[order(importance_lm$importance$Overall, decreasing = TRUE)][1:8]
+print(top_vars)
+
+# Obtener nombres de las 8 variables más importantes
+vars_top <- rownames(importance_lm$importance)[order(importance_lm$importance$Overall, decreasing = TRUE)][1:8]
+
+# Crear fórmula con solo esas variables
+formula_top_ml <- as.formula(paste("Pobre ~", paste(vars_top, collapse = " + ")))
+```
+
+## 8.8 Entramiento del modelo con variables más importantes
+
+```{r}
+# Volver a entrenar modelo con variables seleccionadas
+modelo_lm_top <- train(
+  formula_top_ml,
+  data = train,
+  method = "lm",
+  trControl = ctrl_lm
+)
+
+# Predicciones en train
+pred_train_top_lm <- predict(modelo_lm_top, newdata = train)
+pred_class_top_lm <- ifelse(pred_train_top_lm >= 0.5, 1, 0)
+```
+
+## 8.9 Nueva matriz de confusión y métrica
+
+```{r}
+# Matriz de confusión
+confusionMatrix(factor(pred_class_top_lm), factor(train$Pobre))
+
+# F1
+F1_Score(y_pred = pred_class_top_lm, y_true = train$Pobre, positive = "1")
+```
+## 8.10 Predicción
+
+```{r}
+# Predicciones en test
+pred_test_top_ml <- predict(modelo_lm_top, newdata = test)
+pred_binaria_test_top_ml <- ifelse(pred_test_top_ml >= 0.5, 1, 0)
+```
+
+## 8.11 Template regresión lineal variales top
+
+```{r}
+# Crear nuevo archivo
+submission_top_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_top_ml)
+
+# Exportar
+write.csv(submission_top_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal_TOP.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
+```
+
+## 8.12 Modelo con interacción de las 8 variables top
+
+```{r}
+set.seed(122)
+# 1. Control de entrenamiento (sin classProbs porque es regresión)
+ctrl_lm_interac <- trainControl(method = "cv", number = 5)
+
+# 2. Crear fórmula con interacciones de segundo orden
+formula_interactiva <- as.formula(paste("Pobre ~ (", paste(top_vars, collapse = " + "), ")^2"))
+
+# 3. Entrenamiento del modelo lineal con interacciones
+modelo_interac <- train(
+  formula_interactiva,
+  data = train,
+  method = "lm",
+  trControl = ctrl_lm_interac
+)
+
+# 4. Predicciones en entrenamiento
+pred_train <- predict(modelo_interac, newdata = train)
+
+# 5. Convertir predicciones a clases usando umbral 
+umbral <- 0.3
+pred_clase <- ifelse(pred_train >= umbral, "Pobre", "NoPobre")
+
+# 6. Convertir a factor para comparar
+pred_clase <- factor(pred_clase, levels = c("Pobre", "NoPobre"))
+actual_clase <- factor(ifelse(train$Pobre == 1, "Pobre", "NoPobre"), levels = c("Pobre", "NoPobre"))
+
+# 7. Matriz de confusión
+confusionMatrix(pred_clase, actual_clase)
+
+# 8. F1 Score
+F1_Score(y_pred = pred_clase, y_true = actual_clase, positive = "Pobre")
+
+# 9. Predicciones en test
+pred_test_interac_ml <- predict(modelo_interac, newdata = test)
+pred_binaria_test_interac_ml <- ifelse(pred_test_interac_ml >= 0.5, 1, 0)
+
+# 10. Crear nuevo archivo
+submission_inteac_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_interac_ml)
+
+# Exportar
+write.csv(submission_inteac_lm, 
+          "../05_Predictions/09-04-25_equipo4_RegLineal_interac.csv", 
+          row.names = FALSE, 
+          quote = FALSE)
+```
+
