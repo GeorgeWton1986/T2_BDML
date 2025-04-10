@@ -21,7 +21,8 @@ p_load(tidyverse, # tidy-data
        rpart.plot,
        xgboost,
        pROC,
-       ggplot2)
+       ggplot2,
+       skimr)
 
 install.packages("MLmetrics") # To calculate metrics
 require(MLmetrics)
@@ -153,6 +154,13 @@ test_hogares %>%
 
 colnames(test_personas)
 ```
+## B.3 Estadísticas descriptivas
+
+```{r}
+skim(train)
+skim(test)
+```
+
 
 #1. Pre procesamiento de Train personas y Train hogares
 
