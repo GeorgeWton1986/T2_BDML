@@ -2214,19 +2214,10 @@ write.csv(resultados_prediccion_xgboost_2,
 ## 7.1 Entrenamiento del algoritmo CART- Cuando usamos rpart sin fijar un parámetro de complejidad cp el arbol es podado usando por α = 0,01 por defecto
 
 ```{r}
-# Ver importancia de variables
-importancia <- arbol$variable.importance
-print(importancia)
-```
-
-```{r}
-train_factors_model <- train_factors %>% select(-id)
-
-
 
 arbol <- rpart(Pobre ~ Nper + nmujeres + ncotizando + maxEducLevel + nt_trab_semanal 
                + H_cotizando + nmayor_edad, 
-                       data    = train_factors_model,
+                       data    = train_factors,
                        method = "class" ## define tree for classification
                        )
 arbol$control$cp # alpha
@@ -2236,44 +2227,145 @@ arbol$control$cp # alpha
 prp(arbol, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
 ```
 
-## 7.2 Predicción
-
 ```{r}
-# variables categóricas del test tengan los mismos niveles y tipos
-test_factors_model <- test %>% 
-  mutate(Dominio=factor(Dominio),
-         pagada=factor(pagada,levels = c(0,1),labels = c("No","Yes")),
-         hipoteca=factor(hipoteca,levels = c(0,1),labels = c("No","Yes")),
-         arriendo=factor(arriendo,levels = c(0,1),labels = c("No","Yes")),
-         usufructo=factor(usufructo,levels = c(0,1),labels = c("No","Yes")),
-         sin_titulo=factor(sin_titulo,levels = c(0,1),labels = c("No","Yes")),
-         H_Head_Educ_level = factor(H_Head_Educ_level, levels = c(0:6), labels = c("Ns", "Ninguno", "Preescolar", "Primaria", "Secundaria", "Media", "Universitaria")),
-         maxEducLevel = factor(maxEducLevel, levels = c(0:6), labels = c("Ns", "Ninguno", "Preescolar", "Primaria", "Secundaria", "Media", "Universitaria"))
+# Ver importancia de variables
+importancia <- arbol$variable.importance
+print(importancia)
+```
+
+## 7.2 Predicción
+```{r}
+# Predecir en test_factors
+predictTest_cart <- test_factors %>%
+  mutate(
+    prob_pobre_cart = predict(
+      arbol, 
+      newdata = test_factors[, setdiff(names(test_factors), "id")], 
+      type = "prob"
+    )[,"Yes"],
+
+    pred_pobre_cat_cart = ifelse(prob_pobre_cart > 0.5, "Yes", "No"),
+    pobre = ifelse(pred_pobre_cat_cart == "Yes", 1, 0)
   )
 
-pred_prob_cart <- predict(arbol, newdata = test_factors_model, type = "prob")    ## Predecir la probabilidad (en lugar de la clase)
+# Guardar resultados
+resultados_prediccion_cart <- predictTest_cart %>%
+  select(id, pobre)
 ```
 
+# 7.3 Kaggle
 ```{r}
-# Para Kaggle
-ids <- test$id
+write.csv(resultados_prediccion_cart, 
+          "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/05_Predictions/100425sample_equipo4_cart.csv", 
+          row.names = FALSE)
 
-# Convertir probabilidades 
-pred_binaria <- ifelse(pred_prob_cart[, "Yes"] > 0.5, 1, 0)
-
-
-submission <- data.frame(id = ids, Pobre = pred_clase)
-# 1. Revisa estructura
-str(submission)
 ```
 
-##7.2 Template_CART
 
+## 7.4 Entrenamiento del modelo- balanceado
 ```{r}
-write.csv
-write.csv(submission, 
-          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
-          quote = FALSE)
+library(caret)
+set.seed(123)
+
+control <- trainControl(
+  method = "cv",
+  number = 5,                   # 5-fold CV
+  classProbs = TRUE,            # Necesario para calcular AUC
+  summaryFunction = twoClassSummary,
+  verboseIter = TRUE
+)
+
+modelo_cart_cv <- train(
+  Pobre ~ Nper + nmujeres + ncotizando + maxEducLevel + nt_trab_semanal + 
+    H_cotizando + nmayor_edad,
+  data = train_factors,
+  method = "rpart",
+  trControl = control,
+  metric = "ROC",               # AUC como métrica principal
+  tuneLength = 10               
+)
+
+# Ver resultados
+modelo_cart_cv
+plot(modelo_cart_cv)
+
+```
+## 7.5 Predicciones
+```{r}
+# Asignar umbral de clasificación
+umbral_gral_cart <- 0.5
+
+# Probabilidades en entrenamiento
+prob_train_cart <- predict(arbol_cart, newdata = train_factors, type = "prob")[, "Yes"]
+
+# Clasificación binaria usando umbral general
+pred_train_cart <- ifelse(prob_train_cart > umbral_gral, "Yes", "No")
+
+# Matriz de confusión
+confusionMatrix(factor(pred_train_cart), factor(train_factors$Pobre), positive = "Yes")
+
+# Métricas
+library(MLmetrics)
+
+precision <- Precision(y_pred = pred_train_cart, y_true = train_factors$Pobre, positive = "Yes")
+recall <- Recall(y_pred = pred_train_cart, y_true = train_factors$Pobre, positive = "Yes")
+f1 <- F1_Score(y_pred = pred_train_cart, y_true = train_factors$Pobre, positive = "Yes")
+
+cat(paste0("Precision: ", round(precision, 4), "\n"))
+cat(paste0("Recall: ", round(recall, 4), "\n"))
+cat(paste0("F1 Score: ", round(f1, 4), "\n"))
+
+# Curva ROC y AUC
+library(pROC)
+roc_cart <- roc(response = train_factors$Pobre, predictor = prob_train_cart, levels = c("No", "Yes"))
+auc_cart <- auc(roc_cart)
+cat(paste0("AUC: ", round(auc_cart, 4), "\n"))
+
+# Gráfico ROC
+plot(roc_cart, col = "blue", main = "Curva ROC - CART")
+
+
+```
+
+## 7.6 Predicciones para Kaggle
+```{r}
+# Probabilidades en test
+prob_test_cart <- predict(
+  arbol_cart, 
+  newdata = test_factors[, setdiff(names(test_factors), "id")], 
+  type = "prob"
+)[,"Yes"]
+
+# Clasificación con umbral personalizado
+pred_test_cart <- ifelse(prob_test_cart > umbral_gral_cart, 1, 0)
+
+# Construcción del dataframe final para Kaggle
+resultados_prediccion_cart <- data.frame(
+  id = test_factors$id,
+  pobre = pred_test_cart
+)
+
+```
+
+## 7.7 Kaggle
+```{r}
+# Guardar Kaggle
+write.csv(
+  resultados_prediccion_cart,
+  "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/05_Predictions/10-04-24cartcv.csv",
+  row.names = FALSE,
+  quote = FALSE
+)
+
+```
+
+## 7.8 Evaluación del modelo 2
+```{r}
+cat("Precision:", round(precision, 4), "\n")
+cat("Recall:", round(recall, 4), "\n")
+cat("F1 Score:", round(f1, 4), "\n")
+cat("AUC:", round(auc_cart, 4), "\n")
+
 ```
 
 # 8. Entrenamiento algoritmo de Regresión Lineal
