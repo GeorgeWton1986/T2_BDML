@@ -2112,7 +2112,6 @@ pred_prob_nb <- predict(nb_model, newdata = test_nb, type = "prob")
 #Umbral de 0.3
 pred_clase_nb <- ifelse(pred_prob_nb[, "Yes"] >= 0.3, 1, 0)
 
-# Crear dataframe final para enviar
 predicciones_kaggle_nb <- data.frame(id = test$id, Pobre = pred_clase_nb)
 
 # Ver tabla resumen
@@ -2128,6 +2127,41 @@ write.csv(predicciones_kaggle_nb, "../05_Predictions/sample_equipo4_naivebayes.c
           quote = FALSE)
 ```
 
+##5.6. ROC y AUC con Naive Bayes base entrenamiento 
+```{r}
+# Predicciones sobre el train 
+pred_prob_train <- predict(nb_model, newdata = train_nb, type = "prob")
+
+# Asegurar niveles correctos
+train_nb$Pobre <- factor(train_nb$Pobre, levels = c("No", "Yes"))
+
+# Curva ROC y AUC
+roc_train <- roc(response = train_nb$Pobre, predictor = pred_prob_train[, "Yes"])
+plot(roc_train, col = "darkgreen", main = "Curva ROC - Train (Naive Bayes)")
+auc(roc_train)
+
+```
+
+
+
+```{r}
+
+```
+
+```{r}
+library(MLmetrics)
+
+# Evaluar F1 Score para varios umbrales
+umbrales <- seq(0.1, 0.9, by = 0.05)
+f1_scores <- sapply(umbrales, function(thresh) {
+  pred <- ifelse(pred_prob_nb[, "Yes"] >= thresh, 1, 0)
+  F1_Score(y_true = as.numeric(test$Pobre == "Yes"), y_pred = pred)
+})
+
+# Gráfico de F1 Score según umbral
+plot(umbrales, f1_scores, type = "b", col = "darkred", 
+     main = "F1 Score según umbral", xlab = "Umbral", ylab = "F1 Score")
+```
 
 #6. Boosting / XGBoost
 
@@ -2336,6 +2370,8 @@ precision_inter
 recall_inter
 
 ```
+
+##6.14 Template XGBoost con interacciones
 ```{r}
 ## Template_XGB
 write.csv(resultados_prediccion_xgboost_interacciones,
