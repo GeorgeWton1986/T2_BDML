@@ -2143,7 +2143,6 @@ grid_xgboost <- expand.grid(nrounds = c(250,500),
                             min_child_weight = c(10, 25),
                             colsample_bytree = c(0.4, 0.7), 
                             subsample = c(0.7))
-grid_xgboost
 ```
 
 ##6.2 Balanceo de pesos
@@ -2153,7 +2152,7 @@ grid_xgboost
 # Calcular proporción de clases para asignar peso
 weight_ratio <- sum(train_factors$Pobre == "No") / sum(train_factors$Pobre == "Yes")
 
-# Crear vector de pesos
+# Vector de pesos
 weights <- ifelse(train_factors$Pobre == "Yes", weight_ratio, 1)
 
 # Control de entrenamiento con ROC
@@ -2162,6 +2161,7 @@ ctrl <- trainControl(
   number = 5,
   classProbs = TRUE,                   
   summaryFunction = twoClassSummary,  
+  savePredictions = "final",
   verboseIter = FALSE
 )
 
@@ -2170,7 +2170,7 @@ ctrl <- trainControl(
 ##6.3 Entrenamiento 
 
 ```{r}
-# Entrenar el modelo XGBoost con fórmula directa
+# Entrenar el modelo XGBoost 
 set.seed(123)
 xgb_model <- train(
   Pobre ~ .,                          
@@ -2203,11 +2203,147 @@ table(resultados_prediccion_xgboost_2$Pobre)
 ##6.5 Template XGBoosting
 
 ```{r}
-## Template_RF
+## Template_XGB
 write.csv(resultados_prediccion_xgboost_2,
-          "../predicciones/06-04-25_equipo4_cart.csv", row.names = FALSE, 
+          "C:/../05_Predictions/06-04-25_equipo4_xgboost_cv.csv", row.names = FALSE, 
           quote = FALSE)
 ```
+
+##6.6 Revision de importancia de variables
+
+```{r}
+library(caret)
+plot(varImp(xgb_model), top = 20)
+
+```
+
+##6.7 Metricas de desempeño en validación cruzada
+
+```{r}
+library(yardstick)
+library(dplyr)
+
+# Acceder a las predicciones de validación cruzada
+predicciones_cv <- xgb_model$pred
+
+# Elegir la mejor combinación de hiperparámetros
+mejores_param <- xgb_model$bestTune
+predicciones_filtradas <- predicciones_cv %>%
+  filter(nrounds == mejores_param$nrounds,
+         max_depth == mejores_param$max_depth,
+         eta == mejores_param$eta,
+         gamma == mejores_param$gamma,
+         min_child_weight == mejores_param$min_child_weight,
+         colsample_bytree == mejores_param$colsample_bytree,
+         subsample == mejores_param$subsample)
+
+# Calcular F1, precisión, sensibilidad (recall)
+f1_resultado <- f_meas(predicciones_filtradas, truth = obs, estimate = pred, event_level = "second")
+precision_resultado <- precision(predicciones_filtradas, truth = obs, estimate = pred, event_level = "second")
+recall_resultado <- recall(predicciones_filtradas, truth = obs, estimate = pred, event_level = "second")
+
+f1_resultado
+precision_resultado
+recall_resultado
+
+```
+
+##6.8 Inclusión de interacciones en el modelo
+
+```{r}
+#Creacion bases
+train_inter <- train_factors
+test_inter <- test_factors
+
+```
+
+##6.9 Creación de interacciones de variables para entrenamiento
+
+```{r}
+# Crear dummy: 1 si maxEducLevel es Universitaria
+train_inter$educ_univ <- ifelse(train_inter$maxEducLevel == "Universitaria", 1, 0)
+
+# Crear interacción: educación universitaria x número de personas
+train_inter$educ_x_nper <- train_inter$educ_univ * train_inter$Nper
+```
+
+##6.10 Creación de interacciones de variables para test
+
+```{r}
+# Crear dummy: 1 si tiene educación universitaria, 0 en caso contrario
+test_inter$educ_univ <- ifelse(test_inter$maxEducLevel == "Universitaria", 1, 0)
+
+# Crear variable de interacción: educación universitaria x número de personas
+test_inter$educ_x_nper <- test_inter$educ_univ * test_inter$Nper
+```
+
+##6.11 Entrenamiento CV con interacciones
+
+```{r}
+# Entrenar el modelo XGBoost con fórmula directa
+set.seed(123)
+xgb_model_inter <- train(
+  Pobre ~ .,                          
+  data = train_inter,               
+  method = "xgbTree",
+  trControl = ctrl,
+  tuneGrid = grid_xgboost,
+  metric = "ROC",     
+  weights = weights,                  
+  verbosity = 0
+)
+
+print(xgb_model_inter)
+```
+##6.12 Predicción modelo interacciones
+
+```{r}
+# Obtener probabilidades
+pred_prob_xgboost_interaccion <- predict(xgb_model_inter, newdata = test_inter, type = "prob")
+pred_clase_xgboost_interaccion <- ifelse(pred_prob_xgboost_interaccion[, "Yes"] >= 0.5, 1, 0)
+resultados_prediccion_xgboost_inter <- data.frame(id = test$id, Pobre = pred_clase_xgboost_interaccion)
+
+table(resultados_prediccion_xgboost_inter$Pobre)
+
+```
+##6.13 Metricas de desempeño con interacciones
+
+```{r}
+
+library(yardstick)
+library(dplyr)
+
+predicciones_cv_inter <- xgb_model_inter$pred
+
+# Elegir la mejor combinación de hiperparámetros
+mejores_param_inter <- xgb_model_inter$bestTune
+predicciones_filtradas_inter <- predicciones_cv_inter %>%
+  filter(nrounds == mejores_param_inter$nrounds,
+         max_depth == mejores_param_inter$max_depth,
+         eta == mejores_param_inter$eta,
+         gamma == mejores_param_inter$gamma,
+         min_child_weight == mejores_param_inter$min_child_weight,
+         colsample_bytree == mejores_param_inter$colsample_bytree,
+         subsample == mejores_param_inter$subsample)
+
+# Calcular F1, precisión, sensibilidad (recall)
+f1_inter <- f_meas(predicciones_filtradas_inter, truth = obs, estimate = pred, event_level = "second")
+precision_inter <- precision(predicciones_filtradas_inter, truth = obs, estimate = pred, event_level = "second")
+recall_inter <- recall(predicciones_filtradas_inter, truth = obs, estimate = pred, event_level = "second")
+
+f1_inter
+precision_inter
+recall_inter
+
+```
+```{r}
+## Template_XGB
+write.csv(resultados_prediccion_xgboost_interacciones,
+          "C:/../05_Predictions/06-04-25_equipo4_xgboost_interacciones.csv", row.names = FALSE, 
+          quote = FALSE)
+
+```
+
 
 # 7. Entrenamiento algoritmo CART
 
