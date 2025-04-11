@@ -1742,7 +1742,7 @@ resultados_prediccion_rf <- predictTest_rf %>%
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf, "../05_Predictions/080425sample_equipo4_rf.csv", 
+write.csv(resultados_prediccion_rf, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/05_Predictions/080425sample_equipo4_rf.csv", 
           row.names = FALSE,
           quote = FALSE)
 ```
@@ -1843,7 +1843,7 @@ resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
 
 ```{r}
 ## Template_RF
-write.csv(resultados_prediccion_rf_cv, "../05_Predictions/080425sample_equipo4_rf_cv.csv", 
+write.csv(resultados_prediccion_rf_cv, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML//05_Predictions/080425sample_equipo4_rf_cv.csv", 
           row.names = FALSE,
           quote = FALSE)
 ```
@@ -1886,6 +1886,158 @@ print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
 
 
 ```
+
+# 4.12 Mejorando predicción ajustando por peso
+```{r}
+set.seed(123)
+
+cv_rf_weighted <- train(
+  Pobre ~ .,
+  data = train_importantes,
+  method = "ranger",
+  metric = "ROC",
+  trControl = ctrl_rf_cv,     
+  tuneGrid = mtry_grid,       
+  weights = wts_import,       
+  num.trees = 500,
+  importance = "impurity"
+)
+
+```
+## 4.13 Predicciones 
+```{r}
+# Predicción en test_factors
+predictTest_rf_weighted <- test_factors %>% 
+  mutate(
+    prob_pobre_rf_weighted = predict(
+      cv_rf_weighted, 
+      newdata = test_factors[, setdiff(names(test_factors), "id")], 
+      type = "prob"
+    )[,"Yes"],
+
+    pred_pobre_cat_rf_weighted = ifelse(prob_pobre_rf_weighted > 0.5, "Yes", "No"),
+    pobre = ifelse(pred_pobre_cat_rf_weighted == "Yes", 1, 0)
+  )
+
+# Guardar resultados
+resultados_prediccion_rf_weighted <- predictTest_rf_weighted %>%
+  select(id, pobre)
+```
+
+## 4.14 Template_RF_CV_wighted
+
+```{r}
+## Template_RF
+write.csv(resultados_prediccion_rf_weighted, "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/05_Predictions/080425sample_equipo4_rf_cv_wg.csv", row.names = FALSE)
+```
+
+## 4.15 Mejorando la predicción 
+```{r}
+# Variables al cuadrado
+test_rf_final <- test_factors %>%
+  mutate(Nper_sq = Nper^2)
+
+train_importantes <- train_importantes %>%
+  mutate(Nper_sq = Nper^2)
+
+```
+
+## 4.16 Entrenando el modelo mejorado
+```{r}
+set.seed(123)
+
+cv_rf_weighted_quad <- train(
+  Pobre ~ .,
+  data = train_importantes,
+  method = "ranger",
+  metric = "ROC",
+  trControl = ctrl_rf_cv,
+  tuneGrid = mtry_grid,         
+  weights = wts_import,
+  num.trees = 500,
+  importance = "impurity"
+)
+
+
+```
+
+```{r}
+cv_rf_weighted_quad$results  # Te muestra ROC, Sensibilidad, Especificidad, etc.
+```
+## 4.17 Predicciones
+```{r}
+## 4.13 Predicciones 
+# Predicción en test_factors usando umbral_gral
+predictTest_rf_weighted_quad <- test_factors %>% 
+  mutate(
+    prob_pobre_rf_weighted = predict(
+      cv_rf_weighted, 
+      newdata = test_factors[, setdiff(names(test_factors), "id")], 
+      type = "prob"
+    )[,"Yes"],
+
+    pred_pobre_cat_rf_weighted = ifelse(prob_pobre_rf_weighted > umbral_gral, "Yes", "No"),
+    pobre = ifelse(pred_pobre_cat_rf_weighted == "Yes", 1, 0)
+  )
+
+# Guardar resultados
+resultados_prediccion_rf_weighted_quad <- predictTest_rf_weighted %>%
+  select(id, pobre)
+```
+
+## 4.18 Guardar para kaggle
+```{r}
+## 4.14 Template_RF_CV_weighted
+write.csv(
+  resultados_prediccion_rf_weighted, 
+  "C:/MECA/2025/BIG DATA Y MACHINE LEARNING- Ignasio Sarmiento/Taller2/T2_BDML/05_Predictions/100425sample_equipo4_rf_cv_wg_sq.csv", 
+  row.names = FALSE
+)
+
+```
+
+
+```{r}
+# 1. Predecir probabilidades en el set de entrenamiento
+prob_rf_train <- predict(cv_rf_weighted, newdata = train_importantes, type = "prob")[,"Yes"]
+prob_rf_train
+
+
+# 2. Clasificación con el umbral definido por ti
+pred_rf_train <- ifelse(prob_rf_train > umbral_gral, "Yes", "No")
+
+# 3. Matriz de confusión
+confusionMatrix(
+  factor(pred_rf_train), 
+  factor(train_importantes$Pobre),
+  positive = "Yes"
+)
+
+# 4. F1 Score
+F1_Score(
+  y_pred = pred_rf_train, 
+  y_true = train_importantes$Pobre, 
+  positive = "Yes"
+)
+
+# 5. AUC y curva ROC
+roc_rf <- roc(response = train_importantes$Pobre, predictor = prob_rf_train, levels = c("No", "Yes"))
+auc_rf <- auc(roc_rf)
+print(paste("AUC:", round(auc_rf, 4)))
+
+# 6. Graficar la curva ROC
+plot(roc_rf, col = "darkgreen", main = "Curva ROC - Random Forest Weighted (Train)")
+```
+## 4.19 Evaluación de modelo
+```{r}
+precision <- Precision(y_pred = pred_rf_train, y_true = train_importantes$Pobre, positive = "Yes")
+recall <- Recall(y_pred = pred_rf_train, y_true = train_importantes$Pobre, positive = "Yes")
+
+print(paste("Precision:", round(precision, 4)))
+print(paste("Recall:", round(recall, 4)))
+
+```
+
 
 # 5. Naive Bayes
 
