@@ -11,3 +11,12 @@ Variable	Media	Mediana	Min	Max	Des.st
 10	arriendo	0.39	0	0	1	0.49
 11	usufructo	0.15	0	0	1	0.36
 12	sin_titulo	0.05	0	0	1	0.21
+13	Clase	1.09	1	1	2	0.29
+14	Nper	3.29	3	1	28	1.77
+15	Lp	271522.31	279944.53	167222.48	303816.69	33656.89
+16	H_Head_mujer	0.42	0	0	1	0.49
+17	H_afi_salud	1	1	0	1	0
+18	H_Head_ocupado	0.71	1	0	1	0.45
+19	nt_trab_semanal	1.5	1	0	14	1.03
+20	ncotizando	2.39	2	0	21	1.83
+21	nocupados	1.5	1	0	14	1.03
