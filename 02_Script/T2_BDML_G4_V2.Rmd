@@ -154,13 +154,6 @@ test_hogares %>%
 
 colnames(test_personas)
 ```
-## B.3 Estadísticas descriptivas
-
-```{r}
-skim(train)
-skim(test)
-```
-
 
 #1. Pre procesamiento de Train personas y Train hogares
 
@@ -285,7 +278,7 @@ clear_test_hogares<- test_hogares %>%
   select(id, Clase, Nper, Dominio, pagada, hipoteca, arriendo, usufructo, sin_titulo, Lp)
 ```
 
-##1.6 Consolidar las BD Train y Test Hogares
+##1.6 Consolidar las BD Train, Test Hogares y estadísticas descriptivas
 
 ```{r}
 train<- clear_train_hogares %>% 
@@ -295,6 +288,46 @@ train<- clear_train_hogares %>%
 test<- clear_test_hogares %>% 
           left_join(filter_test_personas_hogar)
 
+# Estadisticas descriptivas
+estadisticas_train <- skim(train)
+estadisticas_test <- skim(test)
+
+# Guardar 
+write.table(estadisticas_train, "../04_Views/TABLA1-ESTADISTICAS_TRAIN.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+write.table(estadisticas_test, "../04_Views/TABLA2-ESTADISTICAS_TEST.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# Selecciona variables clave para modelos
+vars_clave_estadisticas <- train %>%
+  select(Pobre, nmujeres, nmayor_edad, nafi_salud, 
+         H_Head_Educ_level, maxEducLevel, 
+         H_cotizando, pagada, hipoteca, arriendo, usufructo, sin_titulo)
+
+# Función para calcular resumen de una variable
+resumir_variable <- function(var_name, data) {
+  x <- data[[var_name]]
+  tibble(
+    Variable = var_name,
+    Media = mean(as.numeric(x), na.rm = TRUE),
+    Mediana = median(as.numeric(x), na.rm = TRUE),
+    Min = min(as.numeric(x), na.rm = TRUE),
+    Max = max(as.numeric(x), na.rm = TRUE),
+    Des.st = sd(as.numeric(x), na.rm = TRUE)
+  )
+}
+
+# Generar lista de tibbles y unir en uno solo
+resumen_final <- names(vars_clave_estadisticas) %>%
+  map(~resumir_variable(.x, vars_clave_estadisticas)) %>%
+  bind_rows()
+
+# 3. (Opcional) Redondear valores
+resumen_final <- resumen_final %>%
+  mutate(across(where(is.numeric), ~round(., 2)))
+
+ # Guardar 
+write.table(resumen_final, 
+            "../04_Views/TABLA3-RESUMEN-VARIABLES-ESTADISTICAS.txt", 
+            sep = "\t", row.names = TRUE, quote = FALSE)
 ```
 
 ##1.7 Conversion a factores
