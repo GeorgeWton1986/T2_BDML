@@ -1,0 +1,3 @@
+Modelo	Alpha	Lambda
+Modelo General	0.9	1e-04
+Modelo Variables Importantes	0.2	1e-04

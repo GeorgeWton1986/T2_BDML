@@ -1,0 +1,7 @@
+Metrica	Valor	Descripcion
+Accuracy (Exactitud)	0.83524490785645	Proporción total de predicciones correctas
+Precision (Precisión)	0.68077761627907	De los predichos como pobres, cuántos realmente lo son
+Recall (Sensibilidad)	0.574722634081497	De los realmente pobres, cuántos fueron identificados correctamente
+Specificity (Especificidad)	0.916228286263728	De los realmente no pobres, cuántos fueron identificados correctamente
+F1 Score	0.623270771533919	Media armónica entre precisión y recall
+Error Rate (Tasa de error)	0.16475509214355	Proporción de predicciones incorrectas

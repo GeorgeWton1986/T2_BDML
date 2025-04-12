@@ -300,7 +300,9 @@ write.table(estadisticas_test, "../04_Views/TABLA2-ESTADISTICAS_TEST.txt", sep =
 vars_clave_estadisticas <- train %>%
   select(Pobre, nmujeres, nmayor_edad, nafi_salud, 
          H_Head_Educ_level, maxEducLevel, 
-         H_cotizando, pagada, hipoteca, arriendo, usufructo, sin_titulo)
+         H_cotizando, pagada, hipoteca, arriendo, usufructo, sin_titulo,
+         Clase, Nper, Lp, H_Head_mujer, H_afi_salud, H_Head_ocupado,
+         nt_trab_semanal, ncotizando, nocupados)
 
 # Función para calcular resumen de una variable
 resumir_variable <- function(var_name, data) {
@@ -429,7 +431,7 @@ ggplot(datos_plot, aes(x = Clase, y = Proporcion, fill = Tipo)) +
   ylim(0, 1)
 
 # Guardar el gráfico con una ruta relativa a la carpeta
-ggsave("../04_Views/GRAFICO2-PROPORCION_DE_CLASES.png", dpi = 300)
+ggsave("../04_Views/GRAFICO2-PROPORCION_DE_CLASES.png", dpi = 150)
 ```
 
 #2. Entrenamiento Modelo Elastic Net
@@ -484,8 +486,11 @@ print(mod_1_EN_gral)
 # Resumen hiperparámetros 
 print(mod_1_EN_gral$bestTune)
 
+# Guardar gráfico de validación cruzada de modelo Elastic Net
+png("../04_Views/GRÁFICO3-RESULTADOS DE VALIDACIÓN CRUZADA EN GENERAL.png", width = 1000, height = 600)
 # Resultados de validación cruzada
-plot(mod_1_EN_gral)
+plot(mod_1_EN_gral) 
+dev.off()
 
 
 ```
@@ -529,7 +534,7 @@ graf_metricas_EN_Gen <- ggplot(prec_recall, aes(x = threshold)) +
   theme_bw()
 
 # Guardar gráfico
-ggsave("../04_Views/GRAFICO3-MÉTRICAS_vs_UMBRAL_DECISION.png", plot = graf_metricas_EN_Gen, dpi = 300, width = 8, height = 6)
+ggsave("../04_Views/GRAFICO4-MÉTRICAS_vs_UMBRAL_DECISION.png", plot = graf_metricas_EN_Gen, dpi = 150, width = 8, height = 6)
 
 # Usar el umbral óptimo para las predicciones
 umbral_gral <- umbral_optimo  # Usar el umbral optimizado
@@ -590,8 +595,8 @@ graf_roc_EN_gen <- ggplot() +
            color = "blue", size = 5)
 
 # Guardar
-ggsave("../04_Views/GRAFICO4-CURVA_ROC_ELASTIC_NET.png", 
-       plot = graf_roc_EN_gen, dpi = 300, width = 8, height = 6)
+ggsave("../04_Views/GRAFICO5-CURVA_ROC_ELASTIC_NET_GEN.png", 
+       plot = graf_roc_EN_gen, dpi = 150, width = 8, height = 6)
 
 ```
 
@@ -615,6 +620,14 @@ counts_table_EN_gral <- data.frame(
 )
 
 print(counts_table_EN_gral)
+
+# Guardar como archivo de texto tabulado
+write.table(counts_table_EN_gral, 
+            file = "../04_Views/TABLA4-TABLA-CONTEOS-ELASTIC-NET-GEN.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##2.9 Metricas Modelo Elastic Net General
@@ -641,8 +654,19 @@ metrics_table_mod_1_EN_gral <- data.frame(
     "Proporción de predicciones incorrectas"
 ))
 
+# Renombrar las columnas del dataframe
+colnames(metrics_table_mod_1_EN_gral) <- c("Metrica", "Valor", "Descripcion")
+
 # Imprimir tabla de métricas
 print(metrics_table_mod_1_EN_gral)
+
+# Guardar como archivo de texto tabulado
+write.table(metrics_table_mod_1_EN_gral, 
+            file = "../04_Views/TABLA5-MÉTRICAS-MODELO-ELASTIC-NET-GEN.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 
@@ -673,7 +697,7 @@ grafico_imp_en <- ggplot(top15, aes(x = reorder(Variable, Importancia), y = Impo
   theme_bw()
 
 # Guardar como imagen PNG
-ggsave("../04_Views/GRÁFICO5-IMPORTANCIA-VAR-ELASTIC-NET.png", 
+ggsave("../04_Views/GRÁFICO6-IMPORTANCIA-VAR-ELASTIC-NET-GENERAL.png", 
        plot = grafico_imp_en, width = 8, height = 6)
 
 
@@ -701,7 +725,7 @@ tabla_pobreza_import <- table(train_importantes$Pobre)
 prop_clases_pobreza_import <- prop.table(tabla_pobreza_import)
 
 # Abrir el dispositivo gráfico
-png("../04_Views/GRÁFICO5-PROPORCIÓN DE CLASES DE POBRAZA IMPORTANTES EN ENTRENAMIENTO.png", width = 800, height = 600, res = 150)
+png("../04_Views/GRÁFICO7-PROPORCIÓN DE CLASES DE POBRAZA IMPORTANTES EN ENTRENAMIENTO.png", width = 800, height = 600, res = 150)
 
 # Visualizar proporción de clases en un gráfico de barras
 barplot(prop_clases_pobreza_import,
@@ -753,11 +777,11 @@ graf_comp_clases <- ggplot(datos_plot_import, aes(x = Clase, y = Proporcion, fil
        x = "Condición de pobreza",
        y = "Proporción") +
   scale_fill_manual(values = c("Original" = "lightgreen", "Ponderada" = "coral")) +
-  theme_minimal() +
+  theme_bw() +
   ylim(0, 1)
 
 # Guardar 
-ggsave("../04_Views/GRAFICO-PROPORCION-CLASES-ORIGINAL-VS-PONDERADA.png", 
+ggsave("../04_Views/GRAFICO8-PROPORCION-CLASES-ORIGINAL-VS-PONDERADA.png", 
        plot = graf_comp_clases, width = 8, height = 6)
 
 ```
@@ -842,8 +866,13 @@ print(mod_1_EN)
 # Resumen hiperparámetros 
 print(mod_1_EN$bestTune)
 
+# Guardar gráfico de validación cruzada de modelo Elastic Net
+png("../04_Views/GRÁFICO9-RESULTADOS DE VALIDACIÓN CRUZADA EN.png", width = 1000, height = 600)
+
 # Resultados de validación cruzada
-plot(mod_1_EN)
+plot(mod_1_EN) 
+
+dev.off()
 ```
 
 
@@ -884,7 +913,10 @@ ggplot(prec_recall, aes(x = threshold)) +
        x = "Umbral",
        y = "Valor",
        color = "Métrica") +
-  theme_minimal()
+  theme_bw()
+
+# Guardar gráfico
+ggsave("../04_Views/GRAFICO10-MÉTRICAS_vs_UMBRAL_DECISION_EN.png", plot = graf_metricas_EN, dpi = 150, width = 8, height = 6)
 
 # Usar el umbral óptimo para las predicciones
 umbral <- umbral_optimo  # Usar el umbral optimizado
@@ -922,15 +954,16 @@ punto_umbral <- data.frame(
 )
 
 # Crear gráfico con ggplot2
-ggplot() +
+# Gráfico ROC con fondo blanco
+graf_roc_EN <- ggplot() +
   geom_line(data = roc_data, aes(x = Especificidad, y = Sensibilidad), 
             color = "blue", size = 1) +
   geom_point(data = punto_umbral, aes(x = Especificidad, y = Sensibilidad), 
              color = "red", size = 3) +
   geom_text(data = punto_umbral, 
             aes(x = Especificidad, y = Sensibilidad, 
-                label = paste("Umbral =", umbral)),
-            hjust = -0.2, vjust = -0.5, color = "red") +
+                label = paste("Umbral =", round(umbral,4))),
+            hjust = -0.2, vjust = -0.5, color = "red", size = 4) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
   labs(
     title = "Curva ROC - Modelo Elastic Net",
@@ -938,11 +971,16 @@ ggplot() +
     x = "1 - Especificidad (Tasa de Falsos Positivos)",
     y = "Sensibilidad (Tasa de Verdaderos Positivos)"
   ) +
-  theme_minimal() +
+  # Fondo blanco clásico y sin cuadrículas
+  theme_bw(base_size = 12) +  
   coord_equal() +
   annotate("text", x = 0.75, y = 0.25, 
            label = paste("AUC =", round(auc_value, 4)), 
            color = "blue", size = 5)
+
+# Guardar
+ggsave("../04_Views/GRAFICO11-CURVA_ROC_ELASTIC_NET.png", 
+       plot = graf_roc_EN, dpi = 150, width = 8, height = 6)
 
 ```
 
@@ -966,6 +1004,14 @@ counts_table_EN <- data.frame(
 )
 
 print(counts_table_EN)
+
+# Guardar como archivo de texto tabulado
+write.table(counts_table_EN, 
+            file = "../04_Views/TABLA6-TABLA-CONTEOS-ELASTIC-NET.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##2.18 Metricas Modelo Elastic Net
@@ -992,8 +1038,19 @@ metrics_table_mod_1_EN <- data.frame(
     "Proporción de predicciones incorrectas"
 ))
 
+# Renombrar las columnas del dataframe
+colnames(metrics_table_mod_1_EN) <- c("Metrica", "Valor", "Descripcion")
+
 # Imprimir tabla de métricas
 print(metrics_table_mod_1_EN)
+
+# Guardar como archivo de texto tabulado
+write.table(metrics_table_mod_1_EN, 
+            file = "../04_Views/TABLA7-MÉTRICAS-MODELO-ELASTIC-NET.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ## 2.19 Comparacion entre el modelo general y el modelo de variables importantes
@@ -1035,6 +1092,17 @@ comparacion_formateada <- comparacion_metricas %>%
 
 print(comparacion_formateada)
 
+#Renombrar las columnas 
+colnames(comparacion_formateada) <- c("Métrica", "Modelo General", "Modelos Variables Import", "Diferencia", "Mejora porcental")
+
+# Guardar como archivo de texto tabulado
+write.table(comparacion_formateada, 
+            file = "../04_Views/TABLA8-COMPARACIÓN-MÉTRICAS-MODELOS-ELASTIC-NET.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
+
 # 2. Comparación gráfica de métricas
 comparacion_long <- comparacion_metricas %>%
   tidyr::pivot_longer(
@@ -1045,7 +1113,7 @@ comparacion_long <- comparacion_metricas %>%
   filter(Métrica != "AUC")  # AUC se visualizará en la curva ROC
 
 # Gráfico comparativo de métricas
-ggplot(comparacion_long, aes(x = Métrica, y = Valor, fill = Modelo)) +
+comp_metricas_EN <- ggplot(comparacion_long, aes(x = Métrica, y = Valor, fill = Modelo)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
   geom_text(aes(label = round(Valor, 3)), 
             position = position_dodge(width = 0.9),
@@ -1056,8 +1124,12 @@ ggplot(comparacion_long, aes(x = Métrica, y = Valor, fill = Modelo)) +
        y = "Valor") +
   scale_fill_manual(values = c("Modelo_General" = "skyblue", 
                                "Modelo_Variables_Importantes" = "coral")) +
-  theme_minimal() +
+  theme_bw() +
   ylim(0, max(comparacion_long$Valor) * 1.1)
+
+#Guardar
+ggsave("../04_Views/GRAFICO12-COMPARACIÓN_MÉTRICAS_ELASTIC_NET.png", 
+       plot = comp_metricas_EN, dpi = 150, width = 8, height = 6)
 
 # 3. Comparación de curvas ROC
 # Extraer datos para ambas curvas ROC
@@ -1085,7 +1157,7 @@ puntos_umbral <- data.frame(
 )
 
 # Crear gráfico comparativo de curvas ROC
-ggplot() +
+comp_ROC_EN <- ggplot() +
   geom_line(data = roc_data_combined, 
             aes(x = Especificidad, y = Sensibilidad, color = Modelo), 
             size = 1) +
@@ -1106,21 +1178,33 @@ ggplot() +
   ) +
   scale_color_manual(values = c("Modelo General" = "skyblue", 
                                "Modelo Variables Importantes" = "coral")) +
-  theme_minimal() +
+  theme_bw() +
   coord_equal() +
   annotate("text", x = 0.75, y = 0.25, 
            label = paste("Mejora en AUC:", 
                          round((auc_value - auc_value_gral) * 100, 2), "%"), 
            color = "darkgreen", size = 4)
 
+#Guardar
+ggsave("../04_Views/GRAFICO13-COMPARACIÓN_ROC_ELASTIC_NET.png", 
+       plot = comp_ROC_EN, dpi = 150, width = 8, height = 6)
+
 # 4. Comparación de hiperparámetros óptimos
-hiperparametros <- data.frame(
+hiperparametros_EN <- data.frame(
   Modelo = c("Modelo General", "Modelo Variables Importantes"),
   Alpha = c(mod_1_EN_gral$bestTune$alpha, mod_1_EN$bestTune$alpha),
   Lambda = c(mod_1_EN_gral$bestTune$lambda, mod_1_EN$bestTune$lambda)
 )
 
-print(hiperparametros)
+print(hiperparametros_EN)
+
+# Guardar como archivo de texto tabulado
+write.table(hiperparametros_EN, 
+            file = "../04_Views/TABLA9-COMPARACIÓN-HIPERPARÁMETROS-ELASTIC-NET.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 
 # 5. Comparación de matrices de confusión
 # Convertir matrices de confusión a formato largo para visualización
@@ -1146,7 +1230,7 @@ conf_mat_combined <- conf_mat_combined %>%
          Percentage = Count / Total * 100)
 
 # Crear gráficos de heatmap para matrices de confusión
-ggplot(conf_mat_combined, aes(x = Actual, y = Predicted, fill = Count)) +
+comp_matrices_EN <- ggplot(conf_mat_combined, aes(x = Actual, y = Predicted, fill = Count)) +
   geom_tile() +
   facet_wrap(~Modelo) +
   geom_text(aes(label = paste0(Count, "\n(", round(Percentage, 1), "%)"))) +
@@ -1154,7 +1238,11 @@ ggplot(conf_mat_combined, aes(x = Actual, y = Predicted, fill = Count)) +
   labs(title = "Comparación de Matrices de Confusión",
        x = "Clase Real",
        y = "Clase Predicha") +
-  theme_minimal()
+  theme_bw()
+
+#Guardar
+ggsave("../04_Views/GRAFICO14-COMPARACIÓN_MATRIZ_CONFUSIÓN_ELASTIC_NET.png", 
+       plot = comp_matrices_EN, dpi = 150, width = 8, height = 6)
 ```
 
 
@@ -1193,6 +1281,14 @@ prediccion_test_EN <- data.frame(
            sprintf("%.2f%%", 100 * sum(resultados_prediccion_EN$pred_probre_EN) / nrow(resultados_prediccion_EN)))
 )
 print(prediccion_test_EN)
+
+# Guardar como archivo de texto tabulado
+write.table(prediccion_test_EN, 
+            file = "../04_Views/TABLA5-RESUMEN-PREDICCIÓN-ELASTIC-NET.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##2.21 Gráficos de la predicción

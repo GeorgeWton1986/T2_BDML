@@ -1,0 +1,5 @@
+categoría	conteo
+Verdaderos Negativos (TN)	116169
+Falsos Positivos (FP)	11043
+Falsos Negativos (FN)	15767
+Verdaderos Positivos (TP)	21981
