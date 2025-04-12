@@ -2073,7 +2073,25 @@ grid_nb <- expand.grid(
 
 ```
 
-## 5.3 Entrenamiento CV
+## 5.3 Matriz de confusión 
+```{r}
+# Predecir probabilidades sobre el mismo train_nb
+pred_prob_train <- predict(nb_model, newdata = train_nb, type = "prob")
+
+# Clasificar usando umbral 0.3
+pred_clase_train <- ifelse(pred_prob_train[, "Yes"] >= 0.3, "Yes", "No")
+
+# Convertir a factor con niveles correctos
+pred_clase_train <- factor(pred_clase_train, levels = c("No", "Yes"))
+real_train <- factor(train_nb$Pobre, levels = c("No", "Yes"))
+
+# Matriz de confusión
+confusionMatrix(pred_clase_train, real_train, positive = "Yes")
+
+```
+
+
+## 5.4 Entrenamiento CV
 
 ```{r}
 # Control de entrenamiento con validación cruzada
@@ -2103,7 +2121,7 @@ nb_model
 
 ```
 
-## 5.4 Predicciones 
+## 5.5 Predicciones 
 
 ```{r}
 # Obtener probabilidades sobre el test set
@@ -2118,49 +2136,13 @@ predicciones_kaggle_nb <- data.frame(id = test$id, Pobre = pred_clase_nb)
 table(predicciones_kaggle_nb$Pobre)
 ```
 
-## 5.5 Template Naive Bayes
+## 5.6 Template Naive Bayes
 
 ```{r}
 ## Template_RF
 write.csv(predicciones_kaggle_nb, "../05_Predictions/sample_equipo4_naivebayes.csv", 
           row.names = FALSE,
           quote = FALSE)
-```
-
-##5.6. ROC y AUC con Naive Bayes base entrenamiento 
-```{r}
-# Predicciones sobre el train 
-pred_prob_train <- predict(nb_model, newdata = train_nb, type = "prob")
-
-# Asegurar niveles correctos
-train_nb$Pobre <- factor(train_nb$Pobre, levels = c("No", "Yes"))
-
-# Curva ROC y AUC
-roc_train <- roc(response = train_nb$Pobre, predictor = pred_prob_train[, "Yes"])
-plot(roc_train, col = "darkgreen", main = "Curva ROC - Train (Naive Bayes)")
-auc(roc_train)
-
-```
-
-
-
-```{r}
-
-```
-
-```{r}
-library(MLmetrics)
-
-# Evaluar F1 Score para varios umbrales
-umbrales <- seq(0.1, 0.9, by = 0.05)
-f1_scores <- sapply(umbrales, function(thresh) {
-  pred <- ifelse(pred_prob_nb[, "Yes"] >= thresh, 1, 0)
-  F1_Score(y_true = as.numeric(test$Pobre == "Yes"), y_pred = pred)
-})
-
-# Gráfico de F1 Score según umbral
-plot(umbrales, f1_scores, type = "b", col = "darkred", 
-     main = "F1 Score según umbral", xlab = "Umbral", ylab = "F1 Score")
 ```
 
 #6. Boosting / XGBoost
