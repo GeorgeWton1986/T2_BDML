@@ -1966,6 +1966,10 @@ predictTest_rf_cv <- test_factors %>%
 resultados_prediccion_rf_cv <- predictTest_rf_cv %>%
   select(id, pobre)
 
+# Ver las primeras 10 filas en consola
+head(resultados_prediccion_rf_cv, 10)
+
+
 ```
 
 ## 4.9 Template_RF_CV
@@ -1993,7 +1997,7 @@ plot(varImp(cv_rf), top = 10)
 
 ```
 
-## 4.11 Comparar AUC de ambos modelos
+## 4.11 Comparar AUC de ambos modelos y F1 del segundo modelo
 
 ```{r}
 # AUC para modelo RandomForest sin CV
@@ -2015,6 +2019,14 @@ print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
 
 
 ```
+```{r}
+# Ver los resultados del entrenamiento cruzado
+cv_rf$results
+
+
+```
+
+
 
 # 4.12 Mejorando predicción ajustando por peso
 ```{r}
@@ -2052,6 +2064,7 @@ predictTest_rf_weighted <- test_factors %>%
 resultados_prediccion_rf_weighted <- predictTest_rf_weighted %>%
   select(id, pobre)
 ```
+
 
 ## 4.14 Template_RF_CV_wighted
 
@@ -2091,7 +2104,7 @@ cv_rf_weighted_quad <- train(
 ```
 
 ```{r}
-cv_rf_weighted_quad$results  # Te muestra ROC, Sensibilidad, Especificidad, etc.
+cv_rf_weighted_quad$results  # muestra ROC, Sensibilidad, Especificidad, etc.
 ```
 ## 4.17 Predicciones
 ```{r}
@@ -2157,6 +2170,12 @@ print(paste("AUC:", round(auc_rf, 4)))
 # 6. Graficar la curva ROC
 plot(roc_rf, col = "darkgreen", main = "Curva ROC - Random Forest Weighted (Train)")
 ```
+```{r}
+# Mostrar el resultado del AUC
+print(paste("AUC:", round(auc_rf, 4)))
+```
+
+
 ## 4.19 Evaluación de modelo
 ```{r}
 precision <- Precision(y_pred = pred_rf_train, y_true = train_importantes$Pobre, positive = "Yes")
