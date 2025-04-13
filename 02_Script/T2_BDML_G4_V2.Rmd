@@ -2406,9 +2406,22 @@ f1_resultado <- f_meas(predicciones_filtradas, truth = obs, estimate = pred, eve
 precision_resultado <- precision(predicciones_filtradas, truth = obs, estimate = pred, event_level = "second")
 recall_resultado <- recall(predicciones_filtradas, truth = obs, estimate = pred, event_level = "second")
 
+# AUC
+auc_resultado <- roc(response = predicciones_filtradas$obs,
+                     predictor = predicciones_filtradas$Yes,
+                     levels = c("No", "Yes"),
+                     direction = "<") 
+
+# Accuracy
+accuracy_resultado <- accuracy(predicciones_filtradas,
+                               truth = obs,
+                               estimate = pred)
+
 f1_resultado
 precision_resultado
 recall_resultado
+auc_resultado$auc
+accuracy_resultado
 
 ```
 
@@ -2495,9 +2508,17 @@ f1_inter <- f_meas(predicciones_filtradas_inter, truth = obs, estimate = pred, e
 precision_inter <- precision(predicciones_filtradas_inter, truth = obs, estimate = pred, event_level = "second")
 recall_inter <- recall(predicciones_filtradas_inter, truth = obs, estimate = pred, event_level = "second")
 
+#Calcular Accuracy
+accuracy_inter <- accuracy(predicciones_filtradas_inter, truth = obs, estimate = pred)
+
+# Calcular AUC
+auc_inter <- roc_auc(predicciones_filtradas_inter, truth = obs, Yes, event_level = "second")
+
 f1_inter
 precision_inter
 recall_inter
+auc_inter
+accuracy_inter
 
 ```
 
