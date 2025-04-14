@@ -1294,6 +1294,8 @@ write.table(prediccion_test_EN,
 ##2.21 Gráficos de la predicción
 ```{r}
 # Distribucion de probabilidades predichas
+png("../04_Views/GRAFICO15-DISTRIBUCION_PROBABILIDADES_EN.png", width = 800, height = 600)
+
 hist(predictTest_EN$prob_probre_EN, 
      main = "Distribución de probabilidades", 
      xlab = "Probabilidad de ser clasificado como pobre",
@@ -1301,9 +1303,14 @@ hist(predictTest_EN$prob_probre_EN,
      border = "white",
      breaks = 20)  # Puedes ajustar el número de rangos
 
+dev.off()
+
 # Proporción de clases predichas
 prop_clases_EN <- prop.table(table(predictTest_EN$pred_probre_EN))
 print(prop_clases_EN)
+
+# Iniciar entorno
+png("../04_Views/GRAFICO16-PROPORCION_CLASES_PREDICHAS_EN.png", width = 800, height = 600)
 
 # Visualizar proporción de clases en un gráfico de barras
 barplot(prop_clases_EN,
@@ -1320,6 +1327,7 @@ text(x = 1:length(prop_clases_EN),
      labels = paste0(round(prop_clases_EN * 100, 1), "%"),
      cex = 0.8)
 
+dev.off()
 
 ```
 
@@ -1417,6 +1425,13 @@ counts_table_train <- data.frame(
 
 print(counts_table_train)
 
+# Guardar como archivo de texto tabulado
+write.table(counts_table_train_logit, 
+            file = "../04_Views/TABLA11-MATRIZ-CONFUSIÓN-LOGIT.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 
 ```
 
@@ -1467,6 +1482,13 @@ metrics_table_mod_1_log <- data.frame(
 # Mostrar tabla
 print(metrics_table_mod_1_log)
 
+# Guardar como archivo de texto tabulado
+write.table(metrics_table_mod_1_log, 
+            file = "../04_Views/TABLA12-MÉTRICAS-MODELO1-LOGIT.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##3.7 Entrenamiento Fuera de muestra Modelo_Logit
@@ -1548,7 +1570,7 @@ punto_umbral_logit <- data.frame(
 )
 
 # Crear gráfico con ggplot2
-ggplot() +
+graf_roc_LOGIT <- ggplot() +
   geom_line(data = roc_data_logit, aes(x = Especificidad, y = Sensibilidad), 
             color = "blue", size = 1) +
   geom_point(data = punto_umbral_logit, aes(x = Especificidad, y = Sensibilidad), 
@@ -1564,11 +1586,15 @@ ggplot() +
     x = "1 - Especificidad (Tasa de Falsos Positivos)",
     y = "Sensibilidad (Tasa de Verdaderos Positivos)"
   ) +
-  theme_minimal() +
+  theme_bw() +
   coord_equal() +
   annotate("text", x = 0.75, y = 0.25, 
            label = paste("AUC =", round(auc_value, 4)), 
            color = "blue", size = 5)
+
+# Guardar
+ggsave("../04_Views/GRAFICO5-CURVA_ROC_LOGIT.png", 
+       plot = graf_roc_LOGIT, dpi = 150, width = 8, height = 6)
 ```
 
 ##3.11 Matriz de Confusion Logit
@@ -1599,6 +1625,14 @@ total_obs_cv <- sum(counts_table_cv$conteo)
 # Añadir porcentajes a la tabla
 counts_table_cv$porcentaje <- sprintf("%.2f%%", 100 * counts_table_cv$conteo / total_obs_cv)
 print(counts_table_cv)
+
+# Guardar como archivo de texto tabulado
+write.table(counts_table_cv, 
+            file = "../04_Views/TABLA13-MATRIZ-DE-CONFUSIÓN-LOGIT.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 
 ```
 
@@ -1648,6 +1682,14 @@ metrics_table_mod_2_log <- data.frame(
 )
 
 print(metrics_table_mod_2_log)
+
+# Guardar como archivo de texto tabulado
+write.table(metrics_table_mod_2_log, 
+            file = "../04_Views/TABLA14-MÉTRICA-LOGIT2.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##3.13 Explorar la importancia de las variables
@@ -1683,6 +1725,14 @@ comparar_df$Modelo_CV <- sprintf("%.2f%%", comparar_df$Modelo_CV * 100)
 comparar_df$Diferencia <- sprintf("%+.2f%%", comparar_df$Diferencia * 100)
 
 print(comparar_df)
+
+# Guardar como archivo de texto tabulado
+write.table(comparar_df, 
+            file = "../04_Views/TABLA15-COMPAR-MÉTRICA-LOGIT2.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 
 ```
 
@@ -1725,12 +1775,25 @@ prediccion_test_logit <- data.frame(
 
 print(prediccion_test_logit)
 
+# Guardar como archivo de texto tabulado
+write.table(prediccion_test_logit, 
+            file = "../04_Views/TABLA16-PREDICCIÓN-LOGIT2.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
+
 ```
 
 ##3.16 Gráficos de la predicción
 
 ```{r}
+
+# Iniciar entorno
+png("../04_Views/GRAFICO18-HISTOGRAMA-LOGIT.png", width = 800, height = 600)
+
 # Distribucion de probabilidades predichas
+
 hist(predictTest_logit$prob_pobre_logit, 
      main = "Distribución de probabilidades", 
      xlab = "Probabilidad de ser clasificado como pobre",
@@ -1738,9 +1801,14 @@ hist(predictTest_logit$prob_pobre_logit,
      border = "white",
      breaks = 20)  # Puedes ajustar el número de rangos
 
+dev.off()
+
 # Proporción de clases predichas
 prop_clases <- prop.table(table(predictTest_logit$pred_pobre_logit))
 print(prop_clases)
+
+# Iniciar entorno
+png("../04_Views/GRAFICO19-CLASES-PREDICHAS-LOGIT.png", width = 800, height = 600)
 
 # Visualizar proporción de clases en un gráfico de barras
 barplot(prop_clases,
@@ -1756,6 +1824,8 @@ text(x = 1:length(prop_clases),
      y = prop_clases + 0.05,
      labels = paste0(round(prop_clases * 100, 1), "%"),
      cex = 0.8)
+
+dev.off()
 
 ```
 
@@ -1788,6 +1858,14 @@ comparacion_mod_log <- data.frame(
   )
 
 print(comparacion_mod_log)
+
+# Guardar como archivo de texto tabulado
+write.table(comparacion_mod_log, 
+            file = "../04_Views/TABLA17-COMPARACIÓN-MODELO-LOG.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ##3.18 Template_Logit
@@ -1843,6 +1921,14 @@ randomforest <- randomForest::randomForest(Pobre ~ . ,
           
 # Ver resultados
 print(randomforest)
+
+# Guardar como archivo de texto tabulado
+write.table(randomforest, 
+            file = "../04_Views/TABLA18-RESULTADOS-RANDOM-FOREST.txt", 
+            sep = "\t", 
+            row.names = FALSE, 
+            quote = FALSE,
+            fileEncoding = "UTF-8")
 ```
 
 ## 4.3 Predicción con el modelo Random Forest
@@ -2017,12 +2103,8 @@ print(paste("AUC RandomForest: ", round(aucval_rf, 4)))
 print(paste("AUC RandomForest con CV (ranger): ", round(aucval_rf_cv, 4)))
 
 
-
-```
-```{r}
 # Ver los resultados del entrenamiento cruzado
 cv_rf$results
-
 
 ```
 
@@ -2045,7 +2127,9 @@ cv_rf_weighted <- train(
 )
 
 ```
-## 4.13 Predicciones 
+
+## 4.13 Predicciones
+
 ```{r}
 # Predicción en test_factors
 predictTest_rf_weighted <- test_factors %>% 
@@ -2106,7 +2190,9 @@ cv_rf_weighted_quad <- train(
 ```{r}
 cv_rf_weighted_quad$results  # muestra ROC, Sensibilidad, Especificidad, etc.
 ```
+
 ## 4.17 Predicciones
+
 ```{r}
 ## 4.13 Predicciones 
 # Predicción en test_factors usando umbral_gral
@@ -2168,7 +2254,9 @@ auc_rf <- auc(roc_rf)
 print(paste("AUC:", round(auc_rf, 4)))
 
 # 6. Graficar la curva ROC
+png("../04_Views/GRAFICO20-CURVA-ROC-RF-WEIGHTED-TRAIN.png", width = 800, height = 600)
 plot(roc_rf, col = "darkgreen", main = "Curva ROC - Random Forest Weighted (Train)")
+dev.off()
 ```
 ```{r}
 # Mostrar el resultado del AUC
@@ -2281,7 +2369,17 @@ pred_clase_nb <- ifelse(pred_prob_nb[, "Yes"] >= 0.3, 1, 0)
 predicciones_kaggle_nb <- data.frame(id = test$id, Pobre = pred_clase_nb)
 
 # Ver tabla resumen
-table(predicciones_kaggle_nb$Pobre)
+tabla_pred_nb <- table(predicciones_kaggle_nb$Pobre)
+
+tabla_pred_nb_df <- as.data.frame(tabla_pred_nb)
+colnames(tabla_pred_nb_df) <- c("Clase", "Frecuencia")
+
+# 3. Guardar como .txt para Overleaf
+write.table(tabla_pred_nb_df,
+            file = "../04_Views/TABLA20-PREDICCIONES-NB.txt",
+            sep = "\t",            # Tabulación para pgfplotstable
+            row.names = FALSE,
+            quote = FALSE)
 ```
 
 ## 5.6 Template Naive Bayes
@@ -2359,8 +2457,16 @@ pred_prob_xgboost <- predict(xgb_model, newdata = test_factors, type = "prob")
 Pobre_binaria_xgboost <- ifelse(pred_prob_xgboost[, "Yes"] >= 0.5, 1, 0)
 resultados_prediccion_xgboost_2 <- data.frame(id = test$id, Pobre = Pobre_binaria_xgboost)
 
-table(resultados_prediccion_xgboost_2$Pobre)
+tabla_xgb <- table(resultados_prediccion_xgboost_2$Pobre)
 
+tabla_xgb_df <- as.data.frame(tabla_xgb)
+colnames(tabla_xgb_df) <- c("Clase", "Frecuencia")
+
+write.table(tabla_xgb_df,
+            file = "../04_Views/TABLA21-PREDICCIONES-XGBOOST.txt",
+            sep = "\t",            # Tabulación para pgfplotstable
+            row.names = FALSE,
+            quote = FALSE)
 
 ```
 
@@ -2377,8 +2483,10 @@ write.csv(resultados_prediccion_xgboost_2,
 
 ```{r}
 library(caret)
-plot(varImp(xgb_model), top = 20)
-
+png("../04_Views/GRAFICO21-IMPORTANCIA-VARIABLES-XGBOOST.png", width = 1000, height = 800)
+plot(varImp(xgb_model), top = 20, 
+     main = "Top 20 variables más importantes - XGBoost")
+dev.off()
 ```
 
 ##6.7 Metricas de desempeño en validación cruzada
@@ -2480,8 +2588,19 @@ pred_prob_xgboost_interaccion <- predict(xgb_model_inter, newdata = test_inter, 
 pred_clase_xgboost_interaccion <- ifelse(pred_prob_xgboost_interaccion[, "Yes"] >= 0.5, 1, 0)
 resultados_prediccion_xgboost_inter <- data.frame(id = test$id, Pobre = pred_clase_xgboost_interaccion)
 
-table(resultados_prediccion_xgboost_inter$Pobre)
+tabla_xgb_inter <- table(resultados_prediccion_xgboost_inter$Pobre)
 
+# Convertir la tabla en un data frame
+tabla_xgb_inter_df <- as.data.frame(tabla_xgb_inter)
+
+# Renombrar columnas
+colnames(tabla_xgb_inter_df) <- c("Clase", "Frecuencia")
+
+write.table(tabla_xgb_inter_df,
+            file = "../04_Views/TABLA22-PREDICCION-XGBOOST-INTER.txt",
+            sep = "\t",
+            row.names = FALSE,
+            quote = FALSE)
 ```
 ##6.13 Metricas de desempeño con interacciones
 
@@ -2610,10 +2729,15 @@ modelo_cart_cv <- train(
 
 # Ver resultados
 modelo_cart_cv
+png("../04_Views/GRAFICO22-VALIDACION-CRUZADA-CART.png", width = 800, height = 600)
 plot(modelo_cart_cv)
+dev.off()
+
 
 ```
+
 ## 7.5 Predicciones
+
 ```{r}
 # Asignar umbral de clasificación
 umbral_gral_cart <- 0.5
@@ -2645,8 +2769,11 @@ auc_cart <- auc(roc_cart)
 cat(paste0("AUC: ", round(auc_cart, 4), "\n"))
 
 # Gráfico ROC
+png("../04_Views/GRAFICO23-CURVA-ROC-CART.png", width = 800, height = 600)
+
 plot(roc_cart, col = "blue", main = "Curva ROC - CART")
 
+dev.off()
 
 ```
 
@@ -2741,6 +2868,9 @@ pred_test_lm <- predict(modelo_lm, newdata = test)
 # Clasificar con umbral 0.5
 pred_binaria_test_lm <- ifelse(pred_test_lm >= 0.5, 1, 0)
 
+# Resultados
+print(modelo_lm$results)
+
 ```
 
 ## 8.6 Template regresión lineal
@@ -2781,7 +2911,7 @@ graf_import_lm <- ggplot(top_vars, aes(x = reorder(Variable, Overall), y = Overa
   theme_bw()
 
 # Guardar
-ggsave("../04_Views/GRÁFICO-IMPORTANCIA DE VARIABLES REGRESIÓN LINEAL.png",
+ggsave("../04_Views/GRÁFICO24-IMPORTANCIA DE VARIABLES REGRESIÓN LINEAL.png",
        plot = graf_import_lm, width = 10, height = 6, dpi = 300)
 
 # Extraer nombres de las 8 variables más importantes
@@ -2826,6 +2956,9 @@ F1_Score(y_pred = pred_class_top_lm, y_true = train$Pobre, positive = "1")
 # Predicciones en test
 pred_test_top_ml <- predict(modelo_lm_top, newdata = test)
 pred_binaria_test_top_ml <- ifelse(pred_test_top_ml >= 0.5, 1, 0)
+
+# Resultados
+print(modelo_lm_top$results)
 ```
 
 ## 8.11 Template regresión lineal variales top
@@ -2879,6 +3012,9 @@ F1_Score(y_pred = pred_clase, y_true = actual_clase, positive = "Pobre")
 # 9. Predicciones en test
 pred_test_interac_ml <- predict(modelo_interac, newdata = test)
 pred_binaria_test_interac_ml <- ifelse(pred_test_interac_ml >= 0.5, 1, 0)
+
+# Resultados
+print(modelo_interac$results)
 
 # 10. Crear nuevo archivo
 submission_inteac_lm <- data.frame(id = test$id, Pobre = pred_binaria_test_interac_ml)

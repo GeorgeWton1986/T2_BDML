@@ -1,0 +1,5 @@
+Estadística	Valor
+Número total de predicciones	66168
+Hogares clasificados como pobres	15666
+Hogares clasificados como no pobres	50502
+Porcentaje clasificado como pobre	23.68%

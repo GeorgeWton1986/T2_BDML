@@ -1,0 +1,7 @@
+metrica_train	Valor	Descripción
+Accuracy (Exactitud)	0.837257516973812	Proporción total de predicciones correctas
+Precision (Precisión)	0.667544815891473	De los predichos como pobres, cuántos realmente lo son
+Recall (Sensibilidad)	0.581478159949356	De los realmente pobres, cuántos fueron identificados correctamente
+Specificity (Especificidad)	0.913583842327309	De los realmente no pobres, cuántos fueron identificados correctamente
+F1 Score	0.621546182474343	Media armónica entre precisión y recall
+Error Rate (Tasa de error)	0.162742483026188	Proporción de predicciones incorrectas

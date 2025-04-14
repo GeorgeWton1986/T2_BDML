@@ -1,0 +1,5 @@
+categoría	conteo	porcentaje
+Verdaderos Negativos (TN)	116069	70.36%
+Falsos Positivos (FP)	10979	6.66%
+Falsos Negativos (FN)	15867	9.62%
+Verdaderos Positivos (TP)	22045	13.36%

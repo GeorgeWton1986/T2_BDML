@@ -12,10 +12,13 @@ El análisis se divide en diferentes partes: con la adquisición y limpieza de l
 En esta carpeta se encuentra el documento necesario para desarrollar el problem set, junto con la información del DANE y de la misión para el «Empalme de las Series de Empleo, Pobreza y Desigualdad - MESE» y contiene el documento final en pdf.
 
 # 02_Script 
-En esta carpeta se incluye el archivo en R Markdown donde se desarrolla el problem set y el script en R donde se deposita únicamente el código. 
+En esta carpeta se incluye el archivo en R Markdown donde se desarrolla el problem set. 
 
 # 03_Stores 
-En esta carpeta se enceuntra la base de datos ya filtrada utilizada para realizar el problem set. 
+En esta carpeta se enceuntra la base de datos utilizada para realizar el problem set. 
 
 # 04_Views 
 En esta carpeta se evidencian los gráficos obtenidos del código en formato JPG y las tablas con algunos de los resultados
+
+# 05_Predictions
+En esta carteta se evidencia las predicciones realizadas a Kaggle con formato .csv 
